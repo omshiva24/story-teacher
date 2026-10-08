@@ -9,21 +9,92 @@ Search any topic, the way you would search Google: space, animals, maths, histor
 
 ---
 
+## Demo
+
+![Story Teacher demo: search, story with live pictures, game, quiz and report](docs/demo.gif)
+
+[Watch the demo as a video (MP4)](docs/demo.mp4)
+
 ## Screenshots
 
 > Sample story: **Photosynthesis**, age 9 (Class 4), hero **Meera**.
 
-| Home: search any topic | Story with a live picture for each part |
-|---|---|
-| ![Home page with topic search, age slider and topic categories](docs/screenshots/01-home.png) | ![Story part 1 with a "dark vs sun" comparison picture](docs/screenshots/02-story-part1-compare.png) |
-| **Story part 2: a step-by-step flow** | **Picture of the topic: an auto-drawn cycle diagram** |
-| ![Story part 2 with a flow diagram: sunlight, water, leaf, food](docs/screenshots/03-story-part2-flow.png) | ![Cycle diagram of how a plant makes food, with a fun fact](docs/screenshots/04-picture-cycle.png) |
-| **Matching game** | **Quiz inside the story, with kind feedback** |
-| ![Matching game with words and meanings](docs/screenshots/05-matching-game.png) | ![Quiz question showing the right answer and an explanation](docs/screenshots/06-quiz-feedback.png) |
-| **Report for parents and teachers** | **Age 4 (LKG): picture choices** |
-| ![Learning report with score, understood vs needs practice, next activity](docs/screenshots/07-parent-teacher-report.png) | ![Quiz for a 4-year-old with large picture choices](docs/screenshots/08-quiz-age4-picture-choices.png) |
-| **Quick lesson from Wikipedia when the AI is busy** | **Works on phones** |
-| ![Backup lesson built from Simple English Wikipedia](docs/screenshots/11-backup-lesson-wikipedia.png) | ![Mobile home](docs/screenshots/09-mobile-home.png) ![Mobile story](docs/screenshots/10-mobile-story.png) |
+### Home: search any topic
+Search box, age slider from Play school to Class 12, the child as hero, and 8 "Explore ideas" worlds.
+
+<img src="docs/screenshots/01-home.png" alt="Home: search any topic" width="860">
+
+### Story part 1: a picture for what the part explains
+Each story part comes with its own diagram. Here: a plant in the dark vs in the sun.
+
+<img src="docs/screenshots/02-story-part1-compare.png" alt="Story part 1: a picture for what the part explains" width="860">
+
+### Story part 2: a step-by-step flow
+Sunlight ➜ water ➜ leaf kitchen ➜ plant food. Tiles pop in one by one as the part appears.
+
+<img src="docs/screenshots/03-story-part2-flow.png" alt="Story part 2: a step-by-step flow" width="860">
+
+### Story part 3: a group of ideas
+What a happy plant needs.
+
+<img src="docs/screenshots/04-story-part3-group.png" alt="Story part 3: a group of ideas" width="860">
+
+### Picture of the topic: auto-drawn cycle diagram
+Drawn in the browser as SVG, with a text list for screen readers and a "Did you know?" fact.
+
+<img src="docs/screenshots/05-picture-cycle.png" alt="Picture of the topic: auto-drawn cycle diagram" width="860">
+
+### Matching game
+Pick a word, then its meaning. Works with mouse, touch and keyboard.
+
+<img src="docs/screenshots/06-matching-game.png" alt="Matching game" width="860">
+
+### Game finished: stars for fewer tries
+
+<img src="docs/screenshots/07-game-finished-stars.png" alt="Game finished: stars for fewer tries" width="860">
+
+### Quiz inside the story
+"Help Meera…" questions, each linked to one key idea.
+
+<img src="docs/screenshots/08-quiz-question.png" alt="Quiz inside the story" width="860">
+
+### Kind feedback
+Right and wrong are shown with words and symbols, never colour alone, plus a short explanation.
+
+<img src="docs/screenshots/09-quiz-kind-feedback.png" alt="Kind feedback" width="860">
+
+### Report for parents and teachers
+Score, understanding level, game result, ideas understood vs to practise, an activity to try next, and Print.
+
+<img src="docs/screenshots/10-parent-teacher-report.png" alt="Report for parents and teachers" width="860">
+
+### Age 4 (LKG): read-along story
+Very short sentences, bigger text, and a tip for grown-ups to read aloud together.
+
+<img src="docs/screenshots/11-age4-story-read-along.png" alt="Age 4 (LKG): read-along story" width="860">
+
+### Age 4 (LKG): picture choices
+Two big picture-word choices for children who cannot read yet.
+
+<img src="docs/screenshots/13-age4-picture-quiz.png" alt="Age 4 (LKG): picture choices" width="860">
+
+### Accessibility: text size A / A+ / A++
+
+<img src="docs/screenshots/12-accessibility-large-text.png" alt="Accessibility: text size A / A+ / A++" width="860">
+
+### Safety: unsafe topics are blocked
+Checked on the server before the AI is called.
+
+<img src="docs/screenshots/14-safety-filter.png" alt="Safety: unsafe topics are blocked" width="860">
+
+### Always an answer: quick lesson from Wikipedia
+If the AI is busy, a lesson is built from Simple English Wikipedia (younger children) or Wikipedia (teens).
+
+<img src="docs/screenshots/15-backup-lesson-wikipedia.png" alt="Always an answer: quick lesson from Wikipedia" width="860">
+
+### On phones
+
+<img src="docs/screenshots/16-mobile-home.png" alt="Mobile home screen" width="280"> <img src="docs/screenshots/17-mobile-story.png" alt="Mobile story screen" width="280">
 
 ## Features
 
