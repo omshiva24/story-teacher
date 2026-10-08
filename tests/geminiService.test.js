@@ -133,7 +133,7 @@ describe('model fallback and friendly errors', () => {
     const result = await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
     restore();
     expect(generateContent.mock.calls[0][0].model).toBe('old-model');
-    expect(generateContent.mock.calls[2][0].model).toBe('gemini-3.8-flash');
+    expect(generateContent.mock.calls[2][0].model).toBe('gemini-3.5-flash-lite');
     expect(result.data).toEqual({ topicAccepted: false });
   });
 
@@ -163,5 +163,67 @@ describe('model fallback and friendly errors', () => {
   test('keeps errors that are already friendly', () => {
     const timeout = toFriendlyError(Object.assign(new Error('x'), { status: 404 }));
     expect(timeout.code).toBe('AI_MODEL_UNAVAILABLE');
+  });
+});
+
+describe('free quota handling', () => {
+  const quota = () => Object.assign(new Error('RESOURCE_EXHAUSTED: You exceeded your current quota'), { status: 429 });
+  const quiet = () => {
+    const w = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const e = jest.spyOn(console, 'error').mockImplementation(() => {});
+    return () => {
+      w.mockRestore();
+      e.mockRestore();
+    };
+  };
+
+  test('moves to the next model when one is out of quota', async () => {
+    const restore = quiet();
+    const generateContent = jest
+      .fn()
+      .mockRejectedValueOnce(quota())
+      .mockRejectedValueOnce(quota())
+      .mockResolvedValueOnce({ text: '{"topicAccepted":false}' });
+    const client = createGeminiClient({ apiKey: 'k', model: 'gemini-3.8-flash', timeoutMs: 1000, sdk: fakeSdk(generateContent) });
+    const result = await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    restore();
+    expect(result.data).toEqual({ topicAccepted: false });
+    expect(generateContent.mock.calls[2][0].model).toBe('gemini-3.5-flash-lite');
+  });
+
+  test('after a search quota error, search is paused so each story costs one request', async () => {
+    const restore = quiet();
+    let clock = 0;
+    const generateContent = jest
+      .fn()
+      .mockRejectedValueOnce(quota()) // story 1: search call hits quota
+      .mockResolvedValue({ text: '{"topicAccepted":false}' });
+    const client = createGeminiClient({
+      apiKey: 'k',
+      model: 'm',
+      timeoutMs: 1000,
+      sdk: fakeSdk(generateContent),
+      now: () => clock,
+    });
+    await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    expect(generateContent).toHaveBeenCalledTimes(3); // search fail + plain, then plain only
+    expect(generateContent.mock.calls[2][0].config.tools).toBeUndefined();
+
+    clock = 11 * 60 * 1000; // after the pause, search is tried again
+    await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    expect(generateContent.mock.calls[3][0].config.tools).toEqual([{ googleSearch: {} }]);
+    restore();
+  });
+
+  test('when every model is out of quota, the user gets the friendly busy message', async () => {
+    const restore = quiet();
+    const generateContent = jest.fn().mockRejectedValue(quota());
+    const client = createGeminiClient({ apiKey: 'k', model: 'm', timeoutMs: 1000, sdk: fakeSdk(generateContent) });
+    await expect(client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} })).rejects.toMatchObject({
+      status: 429,
+      code: 'AI_BUSY',
+    });
+    restore();
   });
 });
