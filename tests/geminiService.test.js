@@ -227,3 +227,61 @@ describe('free quota handling', () => {
     restore();
   });
 });
+
+describe('safer retries', () => {
+  const quiet = () => {
+    const w = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const e = jest.spyOn(console, 'error').mockImplementation(() => {});
+    return () => {
+      w.mockRestore();
+      e.mockRestore();
+    };
+  };
+
+  test('if Google rejects the JSON schema settings, it retries without the schema', async () => {
+    const restore = quiet();
+    const badSchema = Object.assign(new Error('INVALID_ARGUMENT: Unknown name "propertyOrdering" is not supported'), { status: 400 });
+    const generateContent = jest
+      .fn()
+      .mockRejectedValueOnce(badSchema) // with search
+      .mockRejectedValueOnce(badSchema) // JSON schema
+      .mockResolvedValueOnce({ text: 'Here you go: {"topicAccepted":false}' }); // plain
+    const client = createGeminiClient({ apiKey: 'k', model: 'm', timeoutMs: 1000, sdk: fakeSdk(generateContent) });
+    const result = await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: { type: 'OBJECT' } });
+    restore();
+    expect(result.data).toEqual({ topicAccepted: false });
+    expect(generateContent.mock.calls[2][0].config.responseSchema).toBeUndefined();
+    expect(generateContent.mock.calls[2][0].contents).toMatch(/ONE JSON object/);
+  });
+
+  test('when no known model works, it asks Google for the models this key can use', async () => {
+    const restore = quiet();
+    const notFound = Object.assign(new Error('models/x is not found for API version v1beta'), { status: 404 });
+    const generateContent = jest.fn((req) =>
+      req.model === 'gemini-9.9-flash' ? Promise.resolve({ text: '{"topicAccepted":false}' }) : Promise.reject(notFound),
+    );
+    const sdk = {
+      GoogleGenAI: class {
+        constructor() {
+          this.models = {
+            generateContent,
+            list: async () =>
+              (async function* () {
+                yield { name: 'models/text-embedding-004', supportedActions: ['embedContent'] };
+                yield { name: 'models/gemini-9.9-flash', supportedActions: ['generateContent'] };
+              })(),
+          };
+        }
+      },
+    };
+    const client = createGeminiClient({ apiKey: 'k', model: 'm', timeoutMs: 1000, grounding: false, sdk });
+    const result = await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    restore();
+    expect(result.data).toEqual({ topicAccepted: false });
+
+    // The working model is remembered, so the next story goes straight to it.
+    generateContent.mockClear();
+    await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    expect(generateContent.mock.calls[0][0].model).toBe('gemini-9.9-flash');
+  });
+});

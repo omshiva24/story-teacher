@@ -32,12 +32,32 @@ function errorStatus(err) {
 
 /**
  * True when the model name is unknown or not allowed for this key.
+ * (Kept narrow so a "feature not supported" error is not mistaken for it.)
  * @param {any} err
  * @returns {boolean}
  */
 function isModelUnavailable(err) {
   const message = String((err && err.message) || '');
-  return errorStatus(err) === 404 || /not found|is not supported|not available|no longer available/i.test(message);
+  return (
+    errorStatus(err) === 404 ||
+    /models\/[\w.-]+ is not found|is not found for API version|not available (to|for) (new )?users|no longer available|model .*not (found|available)/i.test(
+      message,
+    )
+  );
+}
+
+/**
+ * True when Google rejected the request settings (HTTP 400), e.g. a
+ * schema feature or tool this model does not support. Not a key error.
+ * @param {any} err
+ * @returns {boolean}
+ */
+function isBadRequest(err) {
+  const message = String((err && err.message) || '');
+  return (
+    (errorStatus(err) === 400 || /INVALID_ARGUMENT/i.test(message)) &&
+    !/API key not valid|API_KEY_INVALID/i.test(message)
+  );
 }
 
 /**
@@ -104,6 +124,16 @@ function parseJsonText(text) {
   try {
     return JSON.parse(cleaned);
   } catch {
+    // Without JSON mode a model may add a sentence around the object.
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        /* fall through */
+      }
+    }
     throw new AppError(502, 'AI_BAD_RESPONSE', 'The story came back in a strange shape. Please try again.');
   }
 }
@@ -135,8 +165,37 @@ function extractSources(response) {
 }
 
 /**
+ * Asks Google which Flash models this key can use (for when none of the
+ * known names work). Returns [] if listing is not possible.
+ * @param {object} ai - GoogleGenAI instance.
+ * @returns {Promise<string[]>}
+ */
+async function discoverFlashModels(ai) {
+  if (!ai || !ai.models || typeof ai.models.list !== 'function') {
+    return [];
+  }
+  const names = [];
+  try {
+    const pager = await ai.models.list({ config: { pageSize: 100 } });
+    for await (const info of pager) {
+      const name = String((info && info.name) || '').replace(/^models\//, '');
+      const actions = (info && (info.supportedActions || info.supportedGenerationMethods)) || ['generateContent'];
+      const usable = actions.includes('generateContent');
+      if (usable && /flash/i.test(name) && !/(image|tts|audio|live|embed|vision|exp)/i.test(name)) {
+        names.push(name);
+      }
+      if (names.length >= 15) break;
+    }
+  } catch (err) {
+    console.warn('[gemini] could not list models:', err && err.message);
+  }
+  // Prefer stable names over previews, then newer versions first.
+  return names.sort((a, b) => Number(/preview/i.test(a)) - Number(/preview/i.test(b)) || b.localeCompare(a));
+}
+
+/**
  * Creates the Gemini client. The API key stays on the server.
- * @param {{ apiKey: string, model: string, timeoutMs: number, grounding?: boolean, sdk?: object }} options
+ * @param {{ apiKey: string, model: string, timeoutMs: number, grounding?: boolean, sdk?: object, now?: () => number }} options
  * @returns {{ generateStoryJson: (params: { systemInstruction: string, prompt: string, schema: object }) => Promise<{ data: unknown, sources: object[] }> }}
  */
 function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, now = Date.now }) {
@@ -164,53 +223,77 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
     return clientPromise;
   }
 
-  /** One call to the model, with or without Google Search. */
-  async function callModel({ model: modelName, systemInstruction, prompt, schema, useSearch }) {
+  /** One call to the model. Options: Google Search on/off, JSON schema on/off. */
+  async function callModel({ model: modelName, systemInstruction, prompt, schema, useSearch, useSchema }) {
     const ai = await getClient();
-    const config = {
-      systemInstruction,
-      responseMimeType: 'application/json',
-      responseSchema: schema,
-      temperature: 0.8,
-    };
+    const config = { systemInstruction, temperature: 0.8 };
+    if (useSchema) {
+      config.responseMimeType = 'application/json';
+      config.responseSchema = schema;
+    }
     if (useSearch) {
       config.tools = [{ googleSearch: {} }];
     }
-    const response = await withTimeout(ai.models.generateContent({ model: modelName, contents: prompt, config }), timeoutMs);
+    const contents = useSchema ? prompt : `${prompt}\n\nReply with ONE JSON object only, no other text.`;
+    const response = await withTimeout(ai.models.generateContent({ model: modelName, contents, config }), timeoutMs);
     return { data: parseJsonText(response.text), sources: useSearch ? extractSources(response) : [] };
   }
 
   let searchPausedUntil = 0;
+  let workingModel = null; // remembered after the first success
+  let discovered = false;
 
-  /** Tries one model: with Google Search first (if on and not paused), then without. */
+  /**
+   * Tries one model in safe steps: with Google Search, then plain JSON mode,
+   * then without the JSON schema (the reply is still validated afterwards).
+   * Errors that mean "try another model" (unavailable, quota, key) stop early.
+   */
   async function generateWithModel(modelName, params) {
-    if (grounding && now() >= searchPausedUntil) {
+    const attempts = [];
+    if (grounding && now() >= searchPausedUntil) attempts.push({ useSearch: true, useSchema: true });
+    attempts.push({ useSearch: false, useSchema: true }, { useSearch: false, useSchema: false });
+
+    let lastError;
+    for (const attempt of attempts) {
       try {
-        return await callModel({ ...params, model: modelName, useSearch: true });
+        return await callModel({ ...params, ...attempt, model: modelName });
       } catch (err) {
+        lastError = err;
         if (err && err.code === 'AI_TIMEOUT') throw err;
-        if (isQuotaError(err)) {
-          searchPausedUntil = now() + SEARCH_PAUSE_MS;
+        if (attempt.useSearch) {
+          if (isQuotaError(err)) searchPausedUntil = now() + SEARCH_PAUSE_MS;
+          console.warn(`[gemini] ${modelName}: search call failed, retrying without search:`, err && err.message);
+          continue;
         }
-        // Search grounding is not available for every model or key: fall back once.
-        console.warn('[gemini] search-grounded call failed, retrying without search:', err && err.message);
+        if (isModelUnavailable(err) || isQuotaError(err) || !isBadRequest(err)) throw err;
+        console.warn(`[gemini] ${modelName}: request settings rejected, retrying more simply:`, err && err.message);
       }
     }
-    return callModel({ ...params, model: modelName, useSearch: false });
+    throw lastError;
   }
-
-  const models = [...new Set([model, ...FALLBACK_MODELS].filter(Boolean))];
 
   return {
     async generateStoryJson(params) {
+      const queue = [...new Set([workingModel, model, ...FALLBACK_MODELS].filter(Boolean))];
+      const tried = new Set();
       let lastError;
-      for (const modelName of models) {
+      while (queue.length > 0) {
+        const modelName = queue.shift();
+        if (tried.has(modelName)) continue;
+        tried.add(modelName);
         try {
-          return await generateWithModel(modelName, params);
+          const result = await generateWithModel(modelName, params);
+          workingModel = modelName;
+          return result;
         } catch (err) {
           lastError = err;
-          if (!isModelUnavailable(err) && !isQuotaError(err)) break;
-          console.warn(`[gemini] model "${modelName}" is unavailable or out of quota, trying the next one`);
+          const tryAnother = isModelUnavailable(err) || isQuotaError(err);
+          if (!tryAnother) break;
+          console.warn(`[gemini] model "${modelName}" is unavailable or out of quota, trying another`);
+          if (queue.length === 0 && !discovered) {
+            discovered = true;
+            queue.push(...(await discoverFlashModels(await getClient())).filter((name) => !tried.has(name)));
+          }
         }
       }
       throw toFriendlyError(lastError);
@@ -226,4 +309,6 @@ module.exports = {
   toFriendlyError,
   isModelUnavailable,
   isQuotaError,
+  isBadRequest,
+  discoverFlashModels,
 };
