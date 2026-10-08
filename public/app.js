@@ -462,10 +462,12 @@
     els.parentHint.hidden = data.meta.band.id !== 'early';
     renderTopicPhoto(data.story.topicImage);
     const note = $('fallback-note');
-    note.hidden = !data.meta.fallback;
-    note.textContent = data.meta.fallback
-      ? `⚡ Quick lesson from ${data.story.category}: our AI storyteller is busy right now, so this lesson uses encyclopedia facts. (code: ${data.meta.fallbackReason})`
-      : '';
+    if (note) {
+      note.hidden = !data.meta.fallback;
+      note.textContent = data.meta.fallback
+        ? `⚡ Quick lesson from ${data.story.category}: our AI storyteller is busy right now, so this lesson uses encyclopedia facts. (code: ${data.meta.fallbackReason})`
+        : '';
+    }
 
     resetJourney();
     if (!data.story.visual && !data.story.funFact) markSkipped('visual');
@@ -943,7 +945,8 @@
     fillList($('r-missed'), report.missed, 'Nothing. Great job!');
     $('r-suggestion').textContent = report.practiceSuggestion;
     renderSources(state.story.sources);
-    $('r-sources-title').textContent = state.meta.fallback ? 'Facts from' : 'Facts checked with Google Search';
+    const sourcesTitle = $('r-sources-title');
+    if (sourcesTitle) sourcesTitle.textContent = state.meta.fallback ? 'Facts from' : 'Facts checked with Google Search';
     $('r-date').textContent = `Story: “${state.story.title}” · ${new Date().toLocaleDateString('en-IN', { dateStyle: 'long' })}`;
 
     showPanel('report');
