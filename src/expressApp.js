@@ -45,6 +45,11 @@ function createApp({ storyService, config }) {
       },
     }),
   );
+  // Turn off powerful browser features the app never uses.
+  app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+    next();
+  });
   app.use(compression());
   app.use(express.json({ limit: '10kb' }));
 
