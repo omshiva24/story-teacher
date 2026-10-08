@@ -2,7 +2,7 @@
   "name": "story-teacher",
   "version": "1.0.0",
   "description": "Teaches any school concept through an age-adapted story, checks understanding with a quiz, and gives parents and teachers a report.",
-  "main": "src/server.js",
+  "main": "index.js",
   "private": true,
   "engines": {
     "node": ">=20"
@@ -34,7 +34,8 @@
     "testEnvironment": "node",
     "collectCoverageFrom": [
       "src/**/*.js",
-      "!src/server.js"
+      "!src/server.js",
+      "!src/bootstrap.js"
     ]
   }
 }
