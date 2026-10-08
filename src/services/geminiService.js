@@ -4,9 +4,20 @@ const { AppError } = require('../utils/errors');
 
 const MAX_SOURCES = 5;
 
-// Tried in order after the configured model if a model is not available
-// for this API key (Google limits some models for new keys).
-const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+// Tried in order after the configured model when a model is not available
+// for this key or its free quota is used up. Each model has its own quota,
+// and the Lite models usually have the largest free allowance.
+const FALLBACK_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
+  'gemini-2.5-flash',
+];
+// After a quota error on a Google Search call, skip search for a while so
+// each story costs one request instead of two.
+const SEARCH_PAUSE_MS = 10 * 60 * 1000;
 
 /**
  * Reads the HTTP status from a Gen AI SDK error (shape differs by version).
@@ -30,6 +41,16 @@ function isModelUnavailable(err) {
 }
 
 /**
+ * True when the request hit a rate limit or used-up quota.
+ * @param {any} err
+ * @returns {boolean}
+ */
+function isQuotaError(err) {
+  const message = String((err && err.message) || '');
+  return errorStatus(err) === 429 || /quota|RESOURCE_EXHAUSTED|rate limit/i.test(message);
+}
+
+/**
  * Turns a raw Gemini error into a friendly AppError, and logs the real reason.
  * @param {any} err
  * @returns {AppError}
@@ -45,7 +66,7 @@ function toFriendlyError(err) {
   if (isModelUnavailable(err)) {
     return new AppError(502, 'AI_MODEL_UNAVAILABLE', 'The AI model is not available for this key. (Admin: check GEMINI_MODEL.)');
   }
-  if (status === 429 || /quota|RESOURCE_EXHAUSTED|rate limit/i.test(message)) {
+  if (isQuotaError(err)) {
     return new AppError(429, 'AI_BUSY', 'The AI is busy right now (free limit reached). Please wait a minute and try again.');
   }
   if (status === 503 || /overloaded|UNAVAILABLE/i.test(message)) {
@@ -118,7 +139,7 @@ function extractSources(response) {
  * @param {{ apiKey: string, model: string, timeoutMs: number, grounding?: boolean, sdk?: object }} options
  * @returns {{ generateStoryJson: (params: { systemInstruction: string, prompt: string, schema: object }) => Promise<{ data: unknown, sources: object[] }> }}
  */
-function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk }) {
+function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, now = Date.now }) {
   if (!apiKey) {
     return {
       generateStoryJson: async () => {
@@ -159,13 +180,18 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk })
     return { data: parseJsonText(response.text), sources: useSearch ? extractSources(response) : [] };
   }
 
-  /** Tries one model: with Google Search first (if on), then without. */
+  let searchPausedUntil = 0;
+
+  /** Tries one model: with Google Search first (if on and not paused), then without. */
   async function generateWithModel(modelName, params) {
-    if (grounding) {
+    if (grounding && now() >= searchPausedUntil) {
       try {
         return await callModel({ ...params, model: modelName, useSearch: true });
       } catch (err) {
         if (err && err.code === 'AI_TIMEOUT') throw err;
+        if (isQuotaError(err)) {
+          searchPausedUntil = now() + SEARCH_PAUSE_MS;
+        }
         // Search grounding is not available for every model or key: fall back once.
         console.warn('[gemini] search-grounded call failed, retrying without search:', err && err.message);
       }
@@ -183,8 +209,8 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk })
           return await generateWithModel(modelName, params);
         } catch (err) {
           lastError = err;
-          if (!isModelUnavailable(err)) break;
-          console.warn(`[gemini] model "${modelName}" is not available, trying the next one`);
+          if (!isModelUnavailable(err) && !isQuotaError(err)) break;
+          console.warn(`[gemini] model "${modelName}" is unavailable or out of quota, trying the next one`);
         }
       }
       throw toFriendlyError(lastError);
@@ -192,4 +218,12 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk })
   };
 }
 
-module.exports = { createGeminiClient, withTimeout, parseJsonText, extractSources, toFriendlyError, isModelUnavailable };
+module.exports = {
+  createGeminiClient,
+  withTimeout,
+  parseJsonText,
+  extractSources,
+  toFriendlyError,
+  isModelUnavailable,
+  isQuotaError,
+};
