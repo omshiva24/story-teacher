@@ -12,6 +12,7 @@ const { createGeminiClient } = require('./services/geminiService');
 const { MemoryCache } = require('./services/cache');
 const { createStoryService } = require('./services/storyService');
 const { createWikiImageFinder } = require('./services/wikiImageService');
+const { createWikiArticleFinder } = require('./services/wikiLessonService');
 
 /**
  * @returns {import('express').Express}
@@ -27,7 +28,12 @@ function buildApp() {
     grounding: config.groundingEnabled,
   });
   const cache = new MemoryCache({ maxEntries: config.cacheMaxEntries, ttlMs: config.cacheTtlMs });
-  const storyService = createStoryService({ aiClient, cache, findTopicImage: createWikiImageFinder() });
+  const storyService = createStoryService({
+    aiClient,
+    cache,
+    findTopicImage: createWikiImageFinder(),
+    findArticle: createWikiArticleFinder(),
+  });
   return createApp({ storyService, config });
 }
 

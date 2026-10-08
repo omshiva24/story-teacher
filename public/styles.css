@@ -323,6 +323,10 @@ input[type='range'] { width: 100%; height: 44px; accent-color: var(--primary); c
 .pill { padding: 0.25rem 0.8rem; border-radius: 999px; background: var(--primary); color: #fff; font-weight: 800; font-size: 0.85rem; }
 .pill-soft { background: var(--primary-soft); color: var(--primary-dark); }
 .story-title { font-size: clamp(1.6rem, 3.5vw, 2.2rem); }
+.fallback-note {
+  background: var(--teal-soft); color: var(--teal); font-weight: 700;
+  border-radius: 14px; padding: 0.6rem 0.9rem; margin: 0 0 0.6rem;
+}
 .parent-hint { background: #fff6db; border: 2px dashed var(--sun); border-radius: 14px; padding: 0.6rem 0.9rem; }
 .part-progress { display: flex; gap: 0.4rem; margin: 1rem 0 0.75rem; }
 .pdot { width: 42px; height: 8px; border-radius: 99px; background: var(--border); transition: background 0.3s; }
