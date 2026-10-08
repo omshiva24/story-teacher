@@ -81,10 +81,10 @@ function toFriendlyError(err) {
   const message = String((err && err.message) || '');
   console.error('[gemini] request failed:', status || '', message.slice(0, 500));
   if (/API key not valid|API_KEY_INVALID|invalid api key/i.test(message) || status === 401 || status === 403) {
-    return new AppError(502, 'AI_KEY_INVALID', 'The story service key is not working. (Admin: check GEMINI_API_KEY.)');
+    return new AppError(502, 'AI_KEY_INVALID', 'The story service is not set up correctly right now. Please try again later.');
   }
   if (isModelUnavailable(err)) {
-    return new AppError(502, 'AI_MODEL_UNAVAILABLE', 'The AI model is not available for this key. (Admin: check GEMINI_MODEL.)');
+    return new AppError(502, 'AI_MODEL_UNAVAILABLE', 'The story service is not available right now. Please try again later.');
   }
   if (isQuotaError(err)) {
     return new AppError(429, 'AI_BUSY', 'The AI is busy right now (free limit reached). Please wait a minute and try again.');

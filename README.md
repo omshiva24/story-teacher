@@ -1,5 +1,7 @@
 # 📖 Story Teacher
 
+[![CI](https://github.com/omshiva24/story-teacher/actions/workflows/ci.yml/badge.svg)](https://github.com/omshiva24/story-teacher/actions/workflows/ci.yml) ![Node 20+](https://img.shields.io/badge/node-20%2B-brightgreen) ![WCAG 2.1 AA](https://img.shields.io/badge/accessibility-WCAG%202.1%20AA-blue) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+
 **Learn anything through a story a child won't want to stop reading, then find out whether it worked.**
 
 Search any topic, the way you would search Google: space, animals, maths, history, famous people, or how phones work. Story Teacher turns it into a story made for the child's age (play school to Class 12), a picture of how it works, a matching game, a quiz told inside the story, and a report for parents and teachers. Facts are checked with Google Search, and the sources are shown in the report.
@@ -8,6 +10,33 @@ Search any topic, the way you would search Google: space, animals, maths, histor
 **Repository:** https://github.com/omshiva24/story-teacher
 
 ---
+
+## How Story Teacher meets the judging criteria
+
+| Criterion | Evidence |
+|---|---|
+| **Problem alignment** | Every line of the challenge is mapped to a feature (table below): topic + age in, story out; understanding checked with a game and quiz tied to key ideas; age bands decide what fits a 6-year-old vs a 12-year-old; a report for parents and teachers. |
+| **Code quality** | Small single-purpose modules (`routes`, `services`, `utils`, `middleware`), dependency injection for testability, JSDoc on every function, one source of truth for age bands and scoring shared by server and browser, ESLint enforced in CI. |
+| **Security** | Server-side validation, safety filter, prompt-injection defence, validated AI output, strict CSP, Helmet headers, Permissions-Policy, rate limiting, no `innerHTML`, secrets only in environment variables. See [SECURITY.md](SECURITY.md). |
+| **Efficiency** | One AI call per story, in-memory LRU cache by topic + age band (the child's name is added after caching), Google Search paused after quota errors, compression, static caching, no frontend framework, images drawn in the browser from small JSON. |
+| **Testing** | 200+ Jest + supertest tests across 14 files: validation, safety, age bands, prompts, AI-output validation, Gemini fallback and quota handling, Wikipedia backup, scoring, cache, API status codes and headers, plus static accessibility/security checks of the HTML. The real AI is never called (mocked). Runs on every push in [GitHub Actions](https://github.com/omshiva24/story-teacher/actions). |
+| **Accessibility** | WCAG 2.1 AA: semantic HTML, labels, skip link, keyboard play everywhere, focus management, `aria-live` announcements, `aria-current` steps, 4.5:1 contrast, text-size toggle, reduced motion, read-aloud, no colour-only signals. Checked in `tests/frontend.static.test.js`. |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  U[Child / parent<br>browser] -->|topic, age, name| A[Express app<br>validation + safety filter]
+  A --> C{Cache<br>topic + age band}
+  C -->|hit| R[Personalise with<br>child's name]
+  C -->|miss| G[Google Gemini<br>structured JSON<br>+ Google Search]
+  G -->|validated story| R
+  G -.->|AI busy / unavailable| W[Wikipedia backup<br>quick lesson]
+  W --> R
+  G --> P[Wikipedia photo<br>upload.wikimedia.org]
+  P --> R
+  R -->|story, pictures, game, quiz| U
+```
 
 ## Demo
 

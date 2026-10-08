@@ -142,6 +142,8 @@ describe('other routes and security headers', () => {
     expect(res.headers['content-security-policy']).toMatch(/frame-ancestors 'none'/);
     expect(res.headers['content-security-policy']).toMatch(/img-src 'self' data: https:\/\/upload\.wikimedia\.org/);
     expect(res.headers['x-powered-by']).toBeUndefined();
+    expect(res.headers['permissions-policy']).toMatch(/camera=\(\)/);
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 
   test('serves shared modules to the browser', async () => {
