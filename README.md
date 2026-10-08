@@ -4,10 +4,26 @@
 
 Search any topic, the way you would search Google: space, animals, maths, history, famous people, or how phones work. Story Teacher turns it into a story made for the child's age (play school to Class 12), a picture of how it works, a matching game, a quiz told inside the story, and a report for parents and teachers. Facts are checked with Google Search, and the sources are shown in the report.
 
-**Live app:** _add your Cloud Run URL here_
-**Repository:** _add your GitHub URL here_
+**Live app:** https://story-teacher.vercel.app
+**Repository:** https://github.com/omshiva24/story-teacher
 
 ---
+
+## Screenshots
+
+> Sample story: **Photosynthesis**, age 9 (Class 4), hero **Meera**.
+
+| Home: search any topic | Story with a live picture for each part |
+|---|---|
+| ![Home page with topic search, age slider and topic categories](docs/screenshots/01-home.png) | ![Story part 1 with a "dark vs sun" comparison picture](docs/screenshots/02-story-part1-compare.png) |
+| **Story part 2: a step-by-step flow** | **Picture of the topic: an auto-drawn cycle diagram** |
+| ![Story part 2 with a flow diagram: sunlight, water, leaf, food](docs/screenshots/03-story-part2-flow.png) | ![Cycle diagram of how a plant makes food, with a fun fact](docs/screenshots/04-picture-cycle.png) |
+| **Matching game** | **Quiz inside the story, with kind feedback** |
+| ![Matching game with words and meanings](docs/screenshots/05-matching-game.png) | ![Quiz question showing the right answer and an explanation](docs/screenshots/06-quiz-feedback.png) |
+| **Report for parents and teachers** | **Age 4 (LKG): picture choices** |
+| ![Learning report with score, understood vs needs practice, next activity](docs/screenshots/07-parent-teacher-report.png) | ![Quiz for a 4-year-old with large picture choices](docs/screenshots/08-quiz-age4-picture-choices.png) |
+| **Quick lesson from Wikipedia when the AI is busy** | **Works on phones** |
+| ![Backup lesson built from Simple English Wikipedia](docs/screenshots/11-backup-lesson-wikipedia.png) | ![Mobile home](docs/screenshots/09-mobile-home.png) ![Mobile story](docs/screenshots/10-mobile-story.png) |
 
 ## Features
 
