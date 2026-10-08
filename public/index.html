@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en" class="text-md">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Story Teacher turns any topic into a story for ages 3 to 18, with a picture, a matching game, a quiz and a report for parents and teachers." />
+    <meta name="theme-color" content="#4c2fc4" />
+    <title>Story Teacher · Learn anything through a story</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/shared/ageBands.js" defer></script>
+    <script src="/shared/scoring.js" defer></script>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="Story Teacher home">
+          <span class="brand-mark" aria-hidden="true">📖</span>
+          <span class="brand-name">Story Teacher</span>
+        </a>
+        <div class="header-tools">
+          <p class="star-pill" id="star-pill" aria-live="polite"><span aria-hidden="true">⭐</span> <span id="star-count">0</span> <span class="sr-only">stars earned</span></p>
+          <div class="text-size" role="group" aria-label="Text size">
+            <button type="button" class="size-btn" data-size="md" aria-pressed="true" aria-label="Normal text">A</button>
+            <button type="button" class="size-btn" data-size="lg" aria-pressed="false" aria-label="Large text">A+</button>
+            <button type="button" class="size-btn" data-size="xl" aria-pressed="false" aria-label="Extra large text">A++</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <!-- HOME: search any topic -->
+      <section id="home" aria-labelledby="home-heading">
+        <div class="hero">
+          <div class="hero-deco" aria-hidden="true">
+            <span>🚀</span><span>🦕</span><span>🔬</span><span>🌍</span><span>➗</span><span>🎨</span>
+          </div>
+          <div class="hero-inner">
+            <h1 id="home-heading">What do you want to learn today?</h1>
+            <p class="hero-sub">Search any topic, from space and animals to maths, history or how phones work. We turn it into a story, a picture, a game and a quiz.</p>
+
+            <form id="story-form" class="search-card" novalidate>
+              <div class="field">
+                <label for="topic">Topic</label>
+                <div class="search-box">
+                  <span class="search-icon" aria-hidden="true">🔍</span>
+                  <input id="topic" name="topic" type="search" required minlength="2" maxlength="100" autocomplete="off" placeholder="Try “black holes” or “fractions”" aria-describedby="topic-error" enterkeyhint="go" />
+                  <button type="button" id="surprise-btn" class="btn btn-ghost surprise-btn"><span aria-hidden="true">🎲</span> Surprise me</button>
+                </div>
+                <p id="topic-error" class="field-error" hidden></p>
+              </div>
+
+              <div class="field-row">
+                <div class="field age-field">
+                  <div class="age-head">
+                    <label for="age">Child's age</label>
+                    <output id="age-stage" for="age" class="stage-badge">Age 8 · Class 3</output>
+                  </div>
+                  <input id="age" name="age" type="range" min="3" max="18" step="1" value="8" aria-describedby="age-scale" />
+                  <div class="age-scale" id="age-scale" aria-hidden="true">
+                    <span>Play school</span><span>Class 5</span><span>Class 12</span>
+                  </div>
+                  <p id="age-error" class="field-error" hidden></p>
+                </div>
+
+                <div class="field name-field">
+                  <label for="name">Child's name <span class="optional">(optional)</span></label>
+                  <input id="name" name="name" type="text" maxlength="30" autocomplete="given-name" placeholder="Becomes the hero" aria-describedby="name-error" />
+                  <p id="name-error" class="field-error" hidden></p>
+                </div>
+              </div>
+
+              <button type="submit" id="create-btn" class="btn btn-primary btn-big">Start learning <span aria-hidden="true">→</span></button>
+            </form>
+          </div>
+        </div>
+
+        <div class="explore">
+          <h2 id="explore-heading">Explore ideas</h2>
+          <p class="explore-sub">Pick a world and we'll choose a topic for you.</p>
+          <ul class="category-grid" id="category-grid" aria-labelledby="explore-heading"></ul>
+        </div>
+
+        <ul class="how-it-works" aria-label="How it works">
+          <li><span aria-hidden="true">📚</span><strong>Story</strong> made for their age</li>
+          <li><span aria-hidden="true">🖼️</span><strong>Picture</strong> of how it works</li>
+          <li><span aria-hidden="true">🧩</span><strong>Game</strong> to match ideas</li>
+          <li><span aria-hidden="true">✅</span><strong>Quiz</strong> to check understanding</li>
+          <li><span aria-hidden="true">📋</span><strong>Report</strong> for parents and teachers</li>
+        </ul>
+      </section>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div id="error" class="error-box" role="alert" hidden></div>
+
+      <!-- LESSON -->
+      <div id="lesson" hidden>
+        <h1 class="sr-only" id="lesson-h1">Lesson</h1>
+        <nav aria-label="Learning steps">
+          <ol class="journey" id="journey">
+            <li data-step="story"><span class="j-dot" aria-hidden="true">1</span><span>Story</span></li>
+            <li data-step="visual"><span class="j-dot" aria-hidden="true">2</span><span>Picture</span></li>
+            <li data-step="game"><span class="j-dot" aria-hidden="true">3</span><span>Game</span></li>
+            <li data-step="quiz"><span class="j-dot" aria-hidden="true">4</span><span>Quiz</span></li>
+            <li data-step="report"><span class="j-dot" aria-hidden="true">5</span><span>Report</span></li>
+          </ol>
+        </nav>
+
+        <!-- 1. Story -->
+        <section id="story-panel" class="card panel" aria-labelledby="story-title" hidden>
+          <div class="story-head">
+            <div class="story-head-text">
+              <div class="pill-row">
+                <span class="pill" id="story-category"></span>
+                <span class="pill pill-soft" id="story-age"></span>
+              </div>
+              <h2 id="story-title" class="story-title" tabindex="-1"></h2>
+              <p id="parent-hint" class="parent-hint" hidden>
+                <span aria-hidden="true">👪</span> Grown-ups: read this part aloud together, or press “Read aloud”.
+              </p>
+            </div>
+            <figure id="topic-photo" class="topic-photo" hidden>
+              <img id="topic-photo-img" alt="" width="320" height="220" referrerpolicy="no-referrer" />
+              <figcaption>
+                <span id="topic-photo-caption"></span>
+                <a id="topic-photo-link" target="_blank" rel="noopener noreferrer">Photo: Wikipedia<span class="sr-only"> (opens in a new tab)</span></a>
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="part-progress" aria-hidden="true">
+            <span class="pdot"></span><span class="pdot"></span><span class="pdot"></span>
+          </div>
+
+          <div class="story-layout">
+            <figure class="board" id="part-board" aria-labelledby="board-caption">
+              <div id="board-items" class="board-stage"></div>
+              <figcaption id="board-caption" class="board-caption"></figcaption>
+            </figure>
+            <div class="story-copy">
+              <h3 id="part-heading" class="part-heading" tabindex="-1"></h3>
+              <p id="story-text" class="story-text"></p>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" id="read-story-btn" class="btn btn-secondary speech-btn" aria-pressed="false">
+              <span aria-hidden="true">🔊</span> <span class="btn-label">Read aloud</span>
+            </button>
+            <button type="button" id="next-part-btn" class="btn btn-primary">What happens next?</button>
+          </div>
+        </section>
+
+        <!-- 2. Picture -->
+        <section id="visual-panel" class="card panel" aria-labelledby="visual-heading" hidden>
+          <p class="eyebrow">See how it works</p>
+          <h2 id="visual-heading" tabindex="-1"></h2>
+          <div id="visual" class="visual"></div>
+          <aside class="fun-fact" id="fun-fact-box" aria-labelledby="fun-fact-title">
+            <span class="fun-fact-icon" aria-hidden="true">💡</span>
+            <div>
+              <h3 id="fun-fact-title">Did you know?</h3>
+              <p id="fun-fact"></p>
+            </div>
+          </aside>
+          <div class="actions">
+            <button type="button" id="to-game-btn" class="btn btn-primary">Play the game <span aria-hidden="true">🧩</span></button>
+          </div>
+        </section>
+
+        <!-- 3. Game -->
+        <section id="game-panel" class="card panel" aria-labelledby="game-heading" hidden>
+          <p class="eyebrow">Game time</p>
+          <h2 id="game-heading" tabindex="-1">Match it!</h2>
+          <p id="game-instructions" class="game-instructions"></p>
+          <p class="game-help">Pick one card on the left, then its partner on the right.</p>
+          <div class="game-board">
+            <div>
+              <h3 class="col-title">Words</h3>
+              <ul id="game-terms" class="game-col"></ul>
+            </div>
+            <div>
+              <h3 class="col-title">Meanings</h3>
+              <ul id="game-matches" class="game-col"></ul>
+            </div>
+          </div>
+          <p id="game-status" class="game-status" role="status" aria-live="polite"></p>
+          <div class="actions">
+            <button type="button" id="skip-game-btn" class="btn btn-ghost">Skip game</button>
+            <button type="button" id="to-quiz-btn" class="btn btn-primary" hidden>Take the quiz <span aria-hidden="true">✅</span></button>
+          </div>
+        </section>
+
+        <!-- 4. Quiz -->
+        <section id="quiz-panel" class="card panel" aria-labelledby="quiz-heading" hidden>
+          <div class="quiz-top">
+            <p class="eyebrow" id="quiz-progress"></p>
+            <div class="q-dots" id="q-dots" aria-hidden="true"></div>
+          </div>
+          <h2 id="quiz-heading" tabindex="-1"></h2>
+          <form id="quiz-form" novalidate>
+            <fieldset>
+              <legend id="quiz-question"></legend>
+              <div id="quiz-options" class="options"></div>
+            </fieldset>
+            <p id="quiz-choose-error" class="field-error" hidden>Please choose an answer first.</p>
+            <div class="actions">
+              <button type="button" id="read-question-btn" class="btn btn-secondary speech-btn" aria-pressed="false">
+                <span aria-hidden="true">🔊</span> <span class="btn-label">Read question</span>
+              </button>
+              <button type="submit" id="check-btn" class="btn btn-primary">Check answer</button>
+            </div>
+          </form>
+          <div id="quiz-feedback" class="feedback" role="status" aria-live="polite"></div>
+          <div class="actions">
+            <button type="button" id="next-question-btn" class="btn btn-primary" hidden>Next question</button>
+          </div>
+        </section>
+
+        <!-- 5. Report -->
+        <section id="report-panel" class="card panel report" aria-labelledby="report-heading" hidden>
+          <div class="report-head">
+            <div>
+              <p class="eyebrow">For parents and teachers</p>
+              <h2 id="report-heading" tabindex="-1">Learning report</h2>
+            </div>
+            <p class="report-stars" id="r-stars"></p>
+          </div>
+          <dl class="report-grid">
+            <div><dt>Topic</dt><dd id="r-topic"></dd></div>
+            <div><dt>Age and class</dt><dd id="r-age"></dd></div>
+            <div><dt>Quiz score</dt><dd id="r-score"></dd></div>
+            <div><dt>Understanding</dt><dd id="r-level"></dd></div>
+            <div><dt>Matching game</dt><dd id="r-game"></dd></div>
+          </dl>
+          <div class="report-columns">
+            <div class="report-box good">
+              <h3><span aria-hidden="true">✅</span> Understood</h3>
+              <ul id="r-understood"></ul>
+            </div>
+            <div class="report-box practice">
+              <h3><span aria-hidden="true">🔁</span> Needs practice</h3>
+              <ul id="r-missed"></ul>
+            </div>
+          </div>
+          <h3>Try this next</h3>
+          <p id="r-suggestion" class="suggestion"></p>
+          <div id="r-sources-box" hidden>
+            <h3>Facts checked with Google Search</h3>
+            <ul id="r-sources" class="sources"></ul>
+          </div>
+          <p class="report-date" id="r-date"></p>
+          <div class="actions no-print">
+            <button type="button" id="print-btn" class="btn btn-secondary"><span aria-hidden="true">🖨️</span> Print report</button>
+            <button type="button" id="restart-btn" class="btn btn-primary">Learn another topic</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div id="confetti" class="confetti" aria-hidden="true"></div>
+
+    <footer class="site-footer">
+      <p>Stories are written by AI and fact-checked with Google Search when available. Grown-ups, please check the facts. No child data is stored.</p>
+    </footer>
+  </body>
+</html>

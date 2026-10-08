@@ -1,0 +1,12 @@
+node_modules
+coverage
+tests
+.git
+.gitignore
+.env
+.env.*
+*.md
+eslint.config.js
+.prettierrc
+Dockerfile
+.dockerignore

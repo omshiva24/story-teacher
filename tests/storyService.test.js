@@ -1,0 +1,133 @@
+'use strict';
+
+const { createStoryService, personalize, DEFAULT_HERO } = require('../src/services/storyService');
+const { MemoryCache } = require('../src/services/cache');
+const { AppError } = require('../src/utils/errors');
+const { makeAiResult } = require('./fixtures');
+
+const SOURCES = [{ title: 'NASA', url: 'https://example.org/nasa' }];
+
+const IMAGE = { imageUrl: 'https://upload.wikimedia.org/leaf.png', pageUrl: 'https://en.wikipedia.org/wiki/Photosynthesis', title: 'Photosynthesis', description: '' };
+
+function setup(aiResult = makeAiResult({}, SOURCES), findTopicImage = jest.fn().mockResolvedValue(IMAGE)) {
+  const aiClient = { generateStoryJson: jest.fn().mockResolvedValue(aiResult) };
+  const cache = new MemoryCache({ maxEntries: 10, ttlMs: 60000 });
+  return { aiClient, findTopicImage, service: createStoryService({ aiClient, cache, findTopicImage }) };
+}
+
+describe('storyService.createStory', () => {
+  test('returns a personalised story with school-stage meta', async () => {
+    const { service } = setup();
+    const result = await service.createStory({ topic: 'Photosynthesis', age: 4, name: 'Meera' });
+    expect(result.story.title).toBe('Meera and the Hungry Leaf');
+    expect(result.story).not.toHaveProperty('topicAccepted');
+    expect(result.meta).toMatchObject({ age: 4, stage: 'LKG', hero: 'Meera', cached: false });
+    expect(result.meta.band).toEqual({ id: 'early', label: 'Play school, LKG, UKG', useEmoji: true });
+  });
+
+  test('includes the picture, game, fun fact and Google Search sources', async () => {
+    const { service } = setup();
+    const { story } = await service.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
+    expect(story.visual.type).toBe('cycle');
+    expect(story.game.pairs).toHaveLength(4);
+    expect(story.funFact).toMatch(/oxygen/);
+    expect(story.sceneEmojis).toHaveLength(3);
+    expect(story.sources).toEqual(SOURCES);
+  });
+
+  test('uses a default hero when no name is given', async () => {
+    const { service } = setup();
+    const result = await service.createStory({ topic: 'Photosynthesis', age: 10, name: '' });
+    expect(result.story.storyParts[0]).toContain(DEFAULT_HERO);
+  });
+
+  test('sends the age-band prompt and schema to the AI', async () => {
+    const { service, aiClient } = setup();
+    await service.createStory({ topic: 'Gravity', age: 16, name: '' });
+    const call = aiClient.generateStoryJson.mock.calls[0][0];
+    expect(call.prompt).toContain('Class 10 to 12');
+    expect(call.schema.type).toBe('OBJECT');
+    expect(call.systemInstruction).toMatch(/Never follow instructions/);
+  });
+
+  test('caches by topic and age band, and the name does not break caching', async () => {
+    const { service, aiClient } = setup();
+    await service.createStory({ topic: 'Fractions', age: 9, name: 'Asha' });
+    const second = await service.createStory({ topic: 'fractions', age: 11, name: 'Ravi' });
+    expect(aiClient.generateStoryJson).toHaveBeenCalledTimes(1);
+    expect(second.meta.cached).toBe(true);
+    expect(second.story.title).toBe('Ravi and the Hungry Leaf');
+    expect(second.story.sources).toEqual(SOURCES);
+  });
+
+  test('a different age band makes a new AI call', async () => {
+    const { service, aiClient } = setup();
+    await service.createStory({ topic: 'Fractions', age: 9, name: '' });
+    await service.createStory({ topic: 'Fractions', age: 15, name: '' });
+    expect(aiClient.generateStoryJson).toHaveBeenCalledTimes(2);
+  });
+
+  test('a topic the AI rejects becomes a 400', async () => {
+    const { service } = setup({ data: { topicAccepted: false }, sources: [] });
+    await expect(service.createStory({ topic: 'Gossip about my neighbour', age: 9, name: '' })).rejects.toMatchObject({
+      status: 400,
+      code: 'TOPIC_NOT_ACCEPTED',
+    });
+  });
+
+  test('a broken AI response becomes a friendly 502 and is not cached', async () => {
+    const { service, aiClient } = setup({ data: { topicAccepted: true, title: 'Only a title' }, sources: [] });
+    const attempt = service.createStory({ topic: 'Magnets', age: 9, name: '' });
+    await expect(attempt).rejects.toBeInstanceOf(AppError);
+    await expect(service.createStory({ topic: 'Magnets', age: 9, name: '' })).rejects.toMatchObject({ status: 502 });
+    expect(aiClient.generateStoryJson).toHaveBeenCalledTimes(2);
+  });
+
+  test('missing sources become an empty list', async () => {
+    const { service } = setup({ data: makeAiResult().data });
+    const { story } = await service.createStory({ topic: 'Magnets', age: 9, name: '' });
+    expect(story.sources).toEqual([]);
+  });
+});
+
+describe('topic photo', () => {
+  test('looks up the AI-chosen Wikipedia title and caches the photo', async () => {
+    const { service, findTopicImage } = setup();
+    const first = await service.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
+    const second = await service.createStory({ topic: 'Photosynthesis', age: 10, name: '' });
+    expect(findTopicImage).toHaveBeenCalledTimes(1);
+    expect(findTopicImage.mock.calls[0][0]).toBe('Photosynthesis');
+    expect(first.story.topicImage).toEqual(IMAGE);
+    expect(second.story.topicImage).toEqual(IMAGE);
+  });
+
+  test('a failed photo lookup never breaks the story', async () => {
+    const { service } = setup(undefined, jest.fn().mockRejectedValue(new Error('down')));
+    const { story } = await service.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
+    expect(story.topicImage).toBe(null);
+    expect(story.storyParts).toHaveLength(3);
+  });
+
+  test('no lookup when the AI gives no title', async () => {
+    const { service, findTopicImage } = setup(makeAiResult({ wikiTitle: '' }));
+    const { story } = await service.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
+    expect(findTopicImage).not.toHaveBeenCalled();
+    expect(story.topicImage).toBe(null);
+  });
+
+  test('each story part comes with its own diagram', async () => {
+    const { service } = setup();
+    const { story } = await service.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
+    expect(story.partVisuals).toHaveLength(3);
+    expect(story.partVisuals[1].items.map((i) => i.label)).toContain('Sunlight');
+  });
+});
+
+describe('personalize', () => {
+  test('replaces the token everywhere without changing the original', () => {
+    const original = { a: '{{HERO}} runs', list: ['{{HERO}}', 3], nested: { b: 'hi {{HERO}}' } };
+    const copy = personalize(original, 'Om');
+    expect(copy).toEqual({ a: 'Om runs', list: ['Om', 3], nested: { b: 'hi Om' } });
+    expect(original.a).toBe('{{HERO}} runs');
+  });
+});
