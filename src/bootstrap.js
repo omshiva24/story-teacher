@@ -7,7 +7,7 @@
 require('dotenv').config();
 
 const config = require('./config');
-const { createApp } = require('./app');
+const { createApp } = require('./expressApp');
 const { createGeminiClient } = require('./services/geminiService');
 const { MemoryCache } = require('./services/cache');
 const { createStoryService } = require('./services/storyService');

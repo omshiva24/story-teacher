@@ -1,7 +1,7 @@
 'use strict';
 
 const request = require('supertest');
-const { createApp } = require('../src/app');
+const { createApp } = require('../src/expressApp');
 const { createStoryService } = require('../src/services/storyService');
 const { MemoryCache } = require('../src/services/cache');
 const { AppError } = require('../src/utils/errors');

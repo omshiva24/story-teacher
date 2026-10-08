@@ -140,8 +140,8 @@ The project also runs on Vercel: `index.js` exports the Express app, and `vercel
 
 ```
 src/
-  server.js            start-up only
-  app.js               Express app, security middleware, routes
+  server.js            start-up for Cloud Run and local (bootstrap.js wires services)
+  expressApp.js        Express app, security middleware, routes
   config.js            settings from environment variables
   routes/              POST /api/story
   services/            Gemini client (search grounding + fallback), Wikipedia photo finder, cache, story service
