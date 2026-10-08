@@ -123,6 +123,68 @@ describe('topic photo', () => {
   });
 });
 
+describe('Wikipedia backup when the AI fails', () => {
+  const ARTICLE = {
+    title: 'Volcano',
+    site: 'Simple English Wikipedia',
+    pageUrl: 'https://simple.wikipedia.org/wiki/Volcano',
+    imageUrl: 'https://upload.wikimedia.org/v.jpg',
+    text:
+      'A volcano is an opening in the surface of the Earth. Hot melted rock called magma rises from deep underground. ' +
+      'When magma reaches the surface it is called lava. Volcanoes can erupt with ash, gas and flowing lava. ' +
+      'Some volcanoes are sleeping and have not erupted for thousands of years. Many islands were made by volcanoes.',
+  };
+  const quiet = () => {
+    const spy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    return () => spy.mockRestore();
+  };
+  const failingAi = (code) => ({ generateStoryJson: jest.fn().mockRejectedValue(Object.assign(new AppError(429, code, 'busy'))) });
+
+  test('a search still gets a lesson when the AI is busy', async () => {
+    const restore = quiet();
+    const findArticle = jest.fn().mockResolvedValue(ARTICLE);
+    const cache = new MemoryCache({ maxEntries: 10, ttlMs: 60000 });
+    const service = createStoryService({ aiClient: failingAi('AI_BUSY'), cache, findArticle });
+    const result = await service.createStory({ topic: 'volcanoes', age: 8, name: 'Asha' });
+    restore();
+    expect(result.meta).toMatchObject({ fallback: true, fallbackReason: 'AI_BUSY' });
+    expect(result.story.storyParts[0]).toContain('Asha');
+    expect(result.story.quiz).toHaveLength(3);
+    expect(result.story.sources[0].url).toBe(ARTICLE.pageUrl);
+    expect(result.story.topicImage.imageUrl).toBe(ARTICLE.imageUrl);
+    expect(findArticle.mock.calls[0][1]).toEqual({ simple: true });
+    expect(cache.size).toBe(0); // the AI is tried again next time
+  });
+
+  test('older students get English Wikipedia first', async () => {
+    const restore = quiet();
+    const findArticle = jest.fn().mockResolvedValue(ARTICLE);
+    const service = createStoryService({ aiClient: failingAi('AI_MODEL_UNAVAILABLE'), cache: new MemoryCache({ maxEntries: 5, ttlMs: 1000 }), findArticle });
+    await service.createStory({ topic: 'volcanoes', age: 15, name: '' });
+    restore();
+    expect(findArticle.mock.calls[0][1]).toEqual({ simple: false });
+  });
+
+  test('an unsafe or rejected topic never falls back', async () => {
+    const findArticle = jest.fn().mockResolvedValue(ARTICLE);
+    const aiClient = { generateStoryJson: jest.fn().mockResolvedValue({ data: { topicAccepted: false }, sources: [] }) };
+    const service = createStoryService({ aiClient, cache: new MemoryCache({ maxEntries: 5, ttlMs: 1000 }), findArticle });
+    await expect(service.createStory({ topic: 'gossip', age: 9, name: '' })).rejects.toMatchObject({ code: 'TOPIC_NOT_ACCEPTED' });
+    expect(findArticle).not.toHaveBeenCalled();
+  });
+
+  test('if Wikipedia has nothing either, the original AI error is shown', async () => {
+    const restore = quiet();
+    const service = createStoryService({
+      aiClient: failingAi('AI_BUSY'),
+      cache: new MemoryCache({ maxEntries: 5, ttlMs: 1000 }),
+      findArticle: jest.fn().mockResolvedValue(null),
+    });
+    await expect(service.createStory({ topic: 'zzzz', age: 9, name: '' })).rejects.toMatchObject({ code: 'AI_BUSY' });
+    restore();
+  });
+});
+
 describe('personalize', () => {
   test('replaces the token everywhere without changing the original', () => {
     const original = { a: '{{HERO}} runs', list: ['{{HERO}}', 3], nested: { b: 'hi {{HERO}}' } };
