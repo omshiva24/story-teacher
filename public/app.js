@@ -391,7 +391,7 @@
 
     els.createBtn.disabled = true;
     els.surpriseBtn.disabled = true;
-    setStatus(`Checking facts and writing a story about “${input.topic}” for ${formatAgeLabel(input.age)}…`);
+    setStatus(`Checking facts and writing a story about “${input.topic}” for ${formatAgeLabel(input.age)}… This can take up to 30 seconds.`);
 
     try {
       const data = await requestStory(input);
@@ -400,7 +400,7 @@
     } catch (err) {
       setStatus('');
       showError(err.message);
-      els.error.scrollIntoView({ block: 'center' });
+      els.error.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
     } finally {
       els.createBtn.disabled = false;
       els.surpriseBtn.disabled = false;

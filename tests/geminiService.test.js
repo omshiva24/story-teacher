@@ -1,6 +1,6 @@
 'use strict';
 
-const { createGeminiClient, withTimeout, parseJsonText, extractSources } = require('../src/services/geminiService');
+const { createGeminiClient, withTimeout, parseJsonText, extractSources, toFriendlyError } = require('../src/services/geminiService');
 
 /**
  * A fake Gen AI SDK so tests never call the real API.
@@ -108,5 +108,60 @@ describe('withTimeout', () => {
   test('rejects with a 504 when too slow', async () => {
     const slow = new Promise((resolve) => setTimeout(() => resolve('late'), 200));
     await expect(withTimeout(slow, 10)).rejects.toMatchObject({ status: 504, code: 'AI_TIMEOUT' });
+  });
+});
+
+describe('model fallback and friendly errors', () => {
+  const quiet = () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    return () => {
+      warn.mockRestore();
+      error.mockRestore();
+    };
+  };
+  const notFound = () => Object.assign(new Error('models/old-model is not found for API version v1beta'), { status: 404 });
+
+  test('tries the next model when the configured one is not available', async () => {
+    const restore = quiet();
+    const generateContent = jest
+      .fn()
+      .mockRejectedValueOnce(notFound())
+      .mockRejectedValueOnce(notFound())
+      .mockResolvedValueOnce({ text: '{"topicAccepted":false}' });
+    const client = createGeminiClient({ apiKey: 'k', model: 'old-model', timeoutMs: 1000, sdk: fakeSdk(generateContent) });
+    const result = await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    restore();
+    expect(generateContent.mock.calls[0][0].model).toBe('old-model');
+    expect(generateContent.mock.calls[2][0].model).toBe('gemini-3.8-flash');
+    expect(result.data).toEqual({ topicAccepted: false });
+  });
+
+  test('an invalid key gives a clear message and does not try other models', async () => {
+    const restore = quiet();
+    const badKey = Object.assign(new Error('API key not valid. Please pass a valid API key.'), { status: 400 });
+    const generateContent = jest.fn().mockRejectedValue(badKey);
+    const client = createGeminiClient({ apiKey: 'k', model: 'm', timeoutMs: 1000, sdk: fakeSdk(generateContent) });
+    await expect(client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} })).rejects.toMatchObject({
+      code: 'AI_KEY_INVALID',
+    });
+    restore();
+    expect(generateContent).toHaveBeenCalledTimes(2); // with search, then without
+  });
+
+  test.each([
+    [{ status: 429, message: 'Resource has been exhausted (e.g. check quota).' }, 429, 'AI_BUSY'],
+    [{ status: 503, message: 'The model is overloaded.' }, 503, 'AI_OVERLOADED'],
+    [{ status: 500, message: 'Internal error' }, 502, 'STORY_FAILED'],
+  ])('maps %p to a friendly error', (raw, status, code) => {
+    const restore = quiet();
+    const friendly = toFriendlyError(Object.assign(new Error(raw.message), { status: raw.status }));
+    restore();
+    expect(friendly).toMatchObject({ status, code });
+  });
+
+  test('keeps errors that are already friendly', () => {
+    const timeout = toFriendlyError(Object.assign(new Error('x'), { status: 404 }));
+    expect(timeout.code).toBe('AI_MODEL_UNAVAILABLE');
   });
 });
