@@ -77,12 +77,25 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk })
     };
   }
 
-  // Loaded only when a key exists, so tests never need the real SDK.
-  const { GoogleGenAI } = sdk || require('@google/genai');
-  const ai = new GoogleGenAI({ apiKey });
+  // The SDK is loaded on the first story, not at start-up, with import()
+  // (works whether the package ships CommonJS or ES modules). A failed load
+  // is retried on the next request instead of crashing the server.
+  let clientPromise = null;
+  function getClient() {
+    if (!clientPromise) {
+      clientPromise = Promise.resolve(sdk || import('@google/genai'))
+        .then(({ GoogleGenAI }) => new GoogleGenAI({ apiKey }))
+        .catch((err) => {
+          clientPromise = null;
+          throw err;
+        });
+    }
+    return clientPromise;
+  }
 
   /** One call to the model, with or without Google Search. */
   async function callModel({ systemInstruction, prompt, schema, useSearch }) {
+    const ai = await getClient();
     const config = {
       systemInstruction,
       responseMimeType: 'application/json',

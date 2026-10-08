@@ -10,6 +10,9 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SHARED_FILES = ['ageBands.js', 'scoring.js'];
+// Required here so serverless bundlers include these files for /shared/ routes.
+require('./utils/ageBands');
+require('./utils/scoring');
 
 /**
  * Builds the Express app. Dependencies are passed in so tests can use mocks.
