@@ -128,6 +128,14 @@ chmod +x deploy.sh
 
 The script enables the services, stores your Gemini key in Secret Manager (asked once, hidden), grants access, builds with the Dockerfile and prints the live URL. Redeploy after changes by running it again.
 
+## Deploy to Vercel
+
+The project also runs on Vercel: `index.js` exports the Express app, and `vercel.json` sets a 60-second function limit and the same security headers for static files.
+
+1. Import the GitHub repo in Vercel (no build settings needed).
+2. In **Settings → Environment Variables**, add `GEMINI_API_KEY` (mark it **Sensitive**) and `GEMINI_MODEL`.
+3. Redeploy.
+
 ## Project structure
 
 ```
