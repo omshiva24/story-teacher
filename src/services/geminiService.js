@@ -4,6 +4,56 @@ const { AppError } = require('../utils/errors');
 
 const MAX_SOURCES = 5;
 
+// Tried in order after the configured model if a model is not available
+// for this API key (Google limits some models for new keys).
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+
+/**
+ * Reads the HTTP status from a Gen AI SDK error (shape differs by version).
+ * @param {any} err
+ * @returns {number|undefined}
+ */
+function errorStatus(err) {
+  const value = err && (err.status ?? err.code ?? (err.error && err.error.code));
+  const number = Number(value);
+  return Number.isInteger(number) ? number : undefined;
+}
+
+/**
+ * True when the model name is unknown or not allowed for this key.
+ * @param {any} err
+ * @returns {boolean}
+ */
+function isModelUnavailable(err) {
+  const message = String((err && err.message) || '');
+  return errorStatus(err) === 404 || /not found|is not supported|not available|no longer available/i.test(message);
+}
+
+/**
+ * Turns a raw Gemini error into a friendly AppError, and logs the real reason.
+ * @param {any} err
+ * @returns {AppError}
+ */
+function toFriendlyError(err) {
+  if (err instanceof AppError) return err;
+  const status = errorStatus(err);
+  const message = String((err && err.message) || '');
+  console.error('[gemini] request failed:', status || '', message.slice(0, 500));
+  if (/API key not valid|API_KEY_INVALID|invalid api key/i.test(message) || status === 401 || status === 403) {
+    return new AppError(502, 'AI_KEY_INVALID', 'The story service key is not working. (Admin: check GEMINI_API_KEY.)');
+  }
+  if (isModelUnavailable(err)) {
+    return new AppError(502, 'AI_MODEL_UNAVAILABLE', 'The AI model is not available for this key. (Admin: check GEMINI_MODEL.)');
+  }
+  if (status === 429 || /quota|RESOURCE_EXHAUSTED|rate limit/i.test(message)) {
+    return new AppError(429, 'AI_BUSY', 'The AI is busy right now (free limit reached). Please wait a minute and try again.');
+  }
+  if (status === 503 || /overloaded|UNAVAILABLE/i.test(message)) {
+    return new AppError(503, 'AI_OVERLOADED', 'The AI is very busy right now. Please try again in a moment.');
+  }
+  return new AppError(502, 'STORY_FAILED', 'Sorry, we could not make the story right now. Please try again.');
+}
+
 /**
  * Rejects if the promise takes longer than the timeout.
  * @template T
@@ -94,7 +144,7 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk })
   }
 
   /** One call to the model, with or without Google Search. */
-  async function callModel({ systemInstruction, prompt, schema, useSearch }) {
+  async function callModel({ model: modelName, systemInstruction, prompt, schema, useSearch }) {
     const ai = await getClient();
     const config = {
       systemInstruction,
@@ -105,24 +155,41 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk })
     if (useSearch) {
       config.tools = [{ googleSearch: {} }];
     }
-    const response = await withTimeout(ai.models.generateContent({ model, contents: prompt, config }), timeoutMs);
+    const response = await withTimeout(ai.models.generateContent({ model: modelName, contents: prompt, config }), timeoutMs);
     return { data: parseJsonText(response.text), sources: useSearch ? extractSources(response) : [] };
   }
 
+  /** Tries one model: with Google Search first (if on), then without. */
+  async function generateWithModel(modelName, params) {
+    if (grounding) {
+      try {
+        return await callModel({ ...params, model: modelName, useSearch: true });
+      } catch (err) {
+        if (err && err.code === 'AI_TIMEOUT') throw err;
+        // Search grounding is not available for every model or key: fall back once.
+        console.warn('[gemini] search-grounded call failed, retrying without search:', err && err.message);
+      }
+    }
+    return callModel({ ...params, model: modelName, useSearch: false });
+  }
+
+  const models = [...new Set([model, ...FALLBACK_MODELS].filter(Boolean))];
+
   return {
     async generateStoryJson(params) {
-      if (grounding) {
+      let lastError;
+      for (const modelName of models) {
         try {
-          return await callModel({ ...params, useSearch: true });
+          return await generateWithModel(modelName, params);
         } catch (err) {
-          if (err && err.code === 'AI_TIMEOUT') throw err;
-          // Search grounding is not available for every model or key: fall back once.
-          console.warn('[gemini] search-grounded call failed, retrying without search:', err && err.message);
+          lastError = err;
+          if (!isModelUnavailable(err)) break;
+          console.warn(`[gemini] model "${modelName}" is not available, trying the next one`);
         }
       }
-      return callModel({ ...params, useSearch: false });
+      throw toFriendlyError(lastError);
     },
   };
 }
 
-module.exports = { createGeminiClient, withTimeout, parseJsonText, extractSources };
+module.exports = { createGeminiClient, withTimeout, parseJsonText, extractSources, toFriendlyError, isModelUnavailable };
