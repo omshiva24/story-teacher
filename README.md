@@ -130,7 +130,7 @@ The script enables the services, stores your Gemini key in Secret Manager (asked
 
 ## Deploy to Vercel
 
-The project also runs on Vercel: `index.js` exports the Express app, and `vercel.json` sets a 60-second function limit and the same security headers for static files.
+The project also runs on Vercel: `src/app.js` exports the ready Express app, and `vercel.json` sets a 60-second function limit and the same security headers for static files.
 
 1. Import the GitHub repo in Vercel (no build settings needed).
 2. In **Settings → Environment Variables**, add `GEMINI_API_KEY` (mark it **Sensitive**) and `GEMINI_MODEL`.
@@ -141,6 +141,7 @@ The project also runs on Vercel: `index.js` exports the Express app, and `vercel
 ```
 src/
   server.js            start-up for Cloud Run and local (bootstrap.js wires services)
+  app.js               Vercel entry: exports the ready Express app
   expressApp.js        Express app, security middleware, routes
   config.js            settings from environment variables
   routes/              POST /api/story

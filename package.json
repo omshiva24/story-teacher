@@ -35,7 +35,8 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/server.js",
-      "!src/bootstrap.js"
+      "!src/bootstrap.js",
+      "!src/app.js"
     ]
   }
 }
