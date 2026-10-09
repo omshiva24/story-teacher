@@ -285,3 +285,31 @@ describe('safer retries', () => {
     expect(generateContent.mock.calls[0][0].model).toBe('gemini-9.9-flash');
   });
 });
+
+describe('AI status check', () => {
+  const { createGeminiClient: create, redact } = require('../src/services/geminiService');
+
+  test('redact removes key-like strings', () => {
+    expect(redact('bad key AIzaSyABC-123 and AQ.Ab8x.y_z here')).toBe('bad key [key] and [key] here');
+  });
+
+  test('reports each model without leaking the key', async () => {
+    const sdk = {
+      GoogleGenAI: function GoogleGenAI() {
+        this.models = {
+          generateContent: async ({ model }) => {
+            if (model === 'good-model') return { text: 'OK' };
+            const err = new Error('API key AIzaSECRET not valid');
+            err.status = 400;
+            throw err;
+          },
+        };
+      },
+    };
+    const client = create({ apiKey: 'AIzaSECRET', model: 'good-model', timeoutMs: 1000, sdk });
+    const status = await client.checkStatus();
+    expect(status.results[0]).toEqual({ model: 'good-model', ok: true });
+    expect(status.results[1].ok).toBe(false);
+    expect(JSON.stringify(status)).not.toContain('SECRET');
+  });
+});
