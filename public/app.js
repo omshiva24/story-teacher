@@ -545,7 +545,7 @@
 
   function renderPartBoard(index) {
     const visual = state.story.partVisuals && state.story.partVisuals[index];
-    if (hasTopicPhoto() && (state.meta.fallback || !visual)) {
+    if (hasTopicPhoto() && !visual) {
       const labels = visual ? visual.items.map((item) => item.label).filter((l) => l !== state.story.topicImage.title) : [];
       els.boardItems.replaceChildren(buildPhotoBoard(labels));
       els.boardCaption.textContent = labels.length > 0 ? `Key ideas in part ${index + 1}` : state.story.topicImage.title;
