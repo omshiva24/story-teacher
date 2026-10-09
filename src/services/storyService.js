@@ -44,6 +44,7 @@ function personalize(value, heroName) {
  * @returns {{ createStory: (input: { topic: string, age: number, name: string }) => Promise<object> }}
  */
 function createStoryService({ aiClient, cache, findTopicImage, findArticle }) {
+  let lastAiError = null;
   /**
    * Looks up a real photo for the topic; never fails the story.
    * @param {string} wikiTitle
@@ -103,6 +104,7 @@ function createStoryService({ aiClient, cache, findTopicImage, findArticle }) {
       return { story, cached: false };
     } catch (err) {
       if (err && err.code === 'TOPIC_NOT_ACCEPTED') throw err;
+      lastAiError = { code: (err && err.code) || null, detail: (err && err.detail) || null, at: new Date().toISOString() };
       console.warn('[story] AI story failed, using the Wikipedia backup:', (err && (err.code || err.message)) || err);
       const lesson = await getFallbackLesson(topic, band);
       if (!lesson) throw err;
@@ -147,6 +149,8 @@ function createStoryService({ aiClient, cache, findTopicImage, findArticle }) {
   }
 
   return {
+    /** Last AI failure (code + redacted detail), for the status check. */
+    getLastAiError: () => lastAiError,
     async createStory({ topic, age, name }) {
       const band = getBand(age);
       const { story, cached, fallbackReason } = await getStoryTemplate(topic, band);

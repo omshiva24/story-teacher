@@ -28,8 +28,18 @@ function createStoryRouter({ storyService, checkAiStatus }) {
       if (!statusCache || Date.now() - statusCache.at > 60000) {
         statusCache = { at: Date.now(), value: await checkAiStatus() };
       }
+      let story = null;
+      if (req.query.story === '1') {
+        const started = Date.now();
+        const result = await storyService.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
+        const meta = (result && result.meta) || {};
+        story = { ms: Date.now() - started, fallback: Boolean(meta.fallback), reason: meta.fallbackReason || null, model: meta.model || null };
+      }
+      if (storyService.getLastAiError) {
+        story = { ...(story || {}), lastAiError: storyService.getLastAiError() };
+      }
       res.set('Cache-Control', 'no-store');
-      res.json(statusCache.value);
+      res.json({ ...statusCache.value, story });
     }),
   );
 
