@@ -76,6 +76,12 @@ function isQuotaError(err) {
  * @returns {AppError}
  */
 function toFriendlyError(err) {
+  const friendly = mapFriendlyError(err);
+  if (!friendly.detail) friendly.detail = redact(String((err && err.message) || '')).slice(0, 300);
+  return friendly;
+}
+
+function mapFriendlyError(err) {
   if (err instanceof AppError) return err;
   const status = errorStatus(err);
   const message = String((err && err.message) || '');
