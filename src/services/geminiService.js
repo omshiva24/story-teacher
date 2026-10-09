@@ -231,9 +231,12 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
   }
 
   /** One call to the model. Options: Google Search on/off, JSON schema on/off. */
-  async function callModel({ model: modelName, systemInstruction, prompt, schema, useSearch, useSchema }) {
+  async function callModel({ model: modelName, systemInstruction, prompt, schema, useSearch, useSchema, fast }) {
     const ai = await getClient();
     const config = { systemInstruction, temperature: 0.8 };
+    // Gemini 3 models think at length by default; a story needs little of it,
+    // and low thinking keeps the reply well inside the time limit.
+    if (fast && /^gemini-3/.test(modelName)) config.thinkingConfig = { thinkingLevel: 'LOW' };
     if (useSchema) {
       config.responseMimeType = 'application/json';
       config.responseSchema = schema;
@@ -257,8 +260,8 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
    */
   async function generateWithModel(modelName, params) {
     const attempts = [];
-    if (grounding && now() >= searchPausedUntil) attempts.push({ useSearch: true, useSchema: true });
-    attempts.push({ useSearch: false, useSchema: true }, { useSearch: false, useSchema: false });
+    if (grounding && now() >= searchPausedUntil) attempts.push({ useSearch: true, useSchema: true, fast: true });
+    attempts.push({ useSearch: false, useSchema: true, fast: true }, { useSearch: false, useSchema: false, fast: false });
 
     let lastError;
     for (const attempt of attempts) {
@@ -266,7 +269,11 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
         return await callModel({ ...params, ...attempt, model: modelName });
       } catch (err) {
         lastError = err;
-        if (err && err.code === 'AI_TIMEOUT') throw err;
+        if (err && err.code === 'AI_TIMEOUT') {
+          // A slow search call: try once more without search, which is quicker.
+          if (attempt.useSearch) continue;
+          throw err;
+        }
         if (attempt.useSearch) {
           if (isQuotaError(err)) searchPausedUntil = now() + SEARCH_PAUSE_MS;
           console.warn(`[gemini] ${modelName}: search call failed, retrying without search:`, err && err.message);
