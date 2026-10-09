@@ -44,7 +44,9 @@ describe('buildFallbackLesson', () => {
       expect(q.options[q.answerIndex].text.length).toBeGreaterThan(4);
     });
     expect(lesson.keyConcepts.length).toBe(3);
-    expect(lesson.visual.type).toBe('steps');
+    expect(['steps', 'parts']).toContain(lesson.visual.type);
+    expect(lesson.visual.items.length).toBeGreaterThan(2);
+    expect(lesson.partVisuals[0].items[0].emoji).toBe('☀️');
     expect(lesson.game.pairs.length).toBeGreaterThan(2);
   });
 

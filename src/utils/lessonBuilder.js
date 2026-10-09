@@ -8,6 +8,7 @@
 
 const { HERO_TOKEN } = require('./promptBuilder');
 const { validateStoryResponse } = require('./responseValidator');
+const { findPictureWords } = require('./topicEmojis');
 
 const STOP_WORDS = new Set(
   (
@@ -181,8 +182,15 @@ function buildFallbackLesson({ article, band }) {
     category: article.site,
     title: `${HERO_TOKEN} and the secrets of ${title}`,
     storyParts,
-    sceneEmojis: ['🔎📘', '💡📖', '🌟🎉'],
+    sceneEmojis: parts.map((group, i) => {
+      const pics = findPictureWords(group.join(' '), 2).map((p) => p.emoji).join('');
+      return pics || ['🔎📘', '💡📖', '🌟🎉'][i];
+    }),
     partVisuals: parts.map((group, i) => {
+      const pictures = findPictureWords(group.join(' '), 4);
+      if (pictures.length >= 2) {
+        return { layout: i === 1 ? 'flow' : 'group', caption: `What part ${i + 1} is about`, items: pictures };
+      }
       const words = [];
       group.forEach((sentence) => {
         const word = pickKeyword(sentence, avoid);
@@ -195,17 +203,37 @@ function buildFallbackLesson({ article, band }) {
     }),
     wikiTitle: '',
     funFact: sentences[sentences.length - 1],
-    visual: {
-      type: 'steps',
-      title: `${title} in three ideas`,
-      items: keyConcepts.map((concept, i) => ({ label: concept.name, emoji: ['1️⃣', '2️⃣', '3️⃣'][i], detail: parts[i][0] })),
-    },
+    visual: buildPictureVisual(title, sentences, keyConcepts, parts),
     game: buildGame(sentences, quizSentences, avoid),
     keyConcepts,
     quiz,
     nextChallenge: `Find one more fact about ${title} with a grown-up and add it to the story.`,
   });
   return story;
+}
+
+/**
+ * Picture step for the quick lesson: real things named in the text, each with
+ * the sentence that mentions it; falls back to the three key ideas.
+ */
+function buildPictureVisual(title, sentences, keyConcepts, parts) {
+  const pictures = findPictureWords(sentences.join(' '), 5);
+  if (pictures.length >= 3) {
+    return {
+      type: 'parts',
+      title: `${title}: what's inside`,
+      items: pictures.map((picture) => {
+        const re = new RegExp(`\\b${picture.label}`, 'i');
+        const sentence = sentences.find((s) => re.test(s)) || '';
+        return { ...picture, detail: sentence.length > 140 ? `${sentence.slice(0, 137).trim()}…` : sentence };
+      }),
+    };
+  }
+  return {
+    type: 'steps',
+    title: `${title} in three ideas`,
+    items: keyConcepts.map((concept, i) => ({ label: concept.name, emoji: ['1️⃣', '2️⃣', '3️⃣'][i], detail: parts[i][0] })),
+  };
 }
 
 module.exports = { buildFallbackLesson, splitSentences, pickKeyword };
