@@ -16,8 +16,22 @@ const SAFETY_MESSAGES = {
  * @param {{ storyService: { createStory: Function } }} deps
  * @returns {import('express').Router}
  */
-function createStoryRouter({ storyService }) {
+function createStoryRouter({ storyService, checkAiStatus }) {
   const router = express.Router();
+
+  // Diagnostic: is the AI reachable with the deployed key? Cached for a minute.
+  let statusCache = null;
+  router.get(
+    '/ai-status',
+    asyncHandler(async (req, res) => {
+      if (!checkAiStatus) throw new AppError(404, 'NOT_FOUND', 'Not available.');
+      if (!statusCache || Date.now() - statusCache.at > 60000) {
+        statusCache = { at: Date.now(), value: await checkAiStatus() };
+      }
+      res.set('Cache-Control', 'no-store');
+      res.json(statusCache.value);
+    }),
+  );
 
   router.post(
     '/story',

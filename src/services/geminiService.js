@@ -204,6 +204,7 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
       generateStoryJson: async () => {
         throw new AppError(503, 'AI_NOT_CONFIGURED', 'The story service is not set up yet. Please try again later.');
       },
+      checkStatus: async () => ({ configured: false, results: [] }),
     };
   }
 
@@ -272,7 +273,32 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
     throw lastError;
   }
 
+  /**
+   * Diagnostic: one tiny call per model, reporting what Google says.
+   * Key-like strings are removed from messages; the key itself is never returned.
+   */
+  async function checkStatus() {
+    const names = [...new Set([model, 'gemini-3.5-flash-lite', 'gemini-2.5-flash'].filter(Boolean))];
+    const results = [];
+    for (const name of names) {
+      try {
+        const ai = await getClient();
+        await withTimeout(ai.models.generateContent({ model: name, contents: 'Reply with the word OK.' }), 15000);
+        results.push({ model: name, ok: true });
+      } catch (err) {
+        results.push({
+          model: name,
+          ok: false,
+          status: (err && (err.status || err.code)) || null,
+          message: redact(String((err && err.message) || err)).slice(0, 300),
+        });
+      }
+    }
+    return { configured: true, keyType: keyType(apiKey), results };
+  }
+
   return {
+    checkStatus,
     async generateStoryJson(params) {
       const queue = [...new Set([workingModel, model, ...FALLBACK_MODELS].filter(Boolean))];
       const tried = new Set();
@@ -301,8 +327,21 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
   };
 }
 
+/** Removes anything that looks like an API key from a message. */
+function redact(text) {
+  return text.replace(/AIza[\w-]+|AQ\.[\w.-]+/g, '[key]');
+}
+
+/** Describes the key's format only (never the key). */
+function keyType(key) {
+  if (/^AIza/.test(key)) return 'AI Studio key (AIza…)';
+  if (/^AQ\./.test(key)) return 'AQ.… key';
+  return 'other format';
+}
+
 module.exports = {
   createGeminiClient,
+  redact,
   withTimeout,
   parseJsonText,
   extractSources,

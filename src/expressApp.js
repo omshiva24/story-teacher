@@ -19,7 +19,7 @@ require('./utils/scoring');
  * @param {{ storyService: object, config: object }} deps
  * @returns {import('express').Express}
  */
-function createApp({ storyService, config }) {
+function createApp({ storyService, config, checkAiStatus }) {
   const app = express();
   const staticMaxAge = config.nodeEnv === 'production' ? '1h' : 0;
 
@@ -62,7 +62,7 @@ function createApp({ storyService, config }) {
     legacyHeaders: false,
     message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Too many stories at once. Please wait a minute.' } },
   });
-  app.use('/api', apiLimiter, createStoryRouter({ storyService }));
+  app.use('/api', apiLimiter, createStoryRouter({ storyService, checkAiStatus }));
   app.use('/api', notFound);
 
   // Shared modules (one source of truth for server and browser).

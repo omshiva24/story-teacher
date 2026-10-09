@@ -34,7 +34,7 @@ function buildApp() {
     findTopicImage: createWikiImageFinder(),
     findArticle: createWikiArticleFinder(),
   });
-  return createApp({ storyService, config });
+  return createApp({ storyService, config, checkAiStatus: aiClient.checkStatus });
 }
 
 module.exports = { buildApp, config };
