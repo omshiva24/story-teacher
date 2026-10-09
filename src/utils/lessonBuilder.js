@@ -125,7 +125,10 @@ function buildGame(sentences, quizSentences, avoid) {
  * @returns {object|null} A validated story, or null if the text is too short.
  */
 function buildFallbackLesson({ article, band }) {
-  const sentences = splitSentences(article.text);
+  // A sentence starting with "It was…" makes no sense on its own: name the topic instead.
+  const sentences = splitSentences(article.text).map((sentence) =>
+    sentence.replace(/^(It|This)\s(?=(is|was|has|had|can|will|became|uses|means|makes)\b)/, `${article.title} `),
+  );
   if (sentences.length < 3) return null;
 
   const perPart = band.id === 'early' ? 1 : band.id === 'primary' ? 2 : 3;
@@ -179,7 +182,17 @@ function buildFallbackLesson({ article, band }) {
     title: `${HERO_TOKEN} and the secrets of ${title}`,
     storyParts,
     sceneEmojis: ['🔎📘', '💡📖', '🌟🎉'],
-    partVisuals: [],
+    partVisuals: parts.map((group, i) => {
+      const words = [];
+      group.forEach((sentence) => {
+        const word = pickKeyword(sentence, avoid);
+        if (word && !words.some((w) => w.toLowerCase() === word.toLowerCase())) words.push(word);
+      });
+      const labels = [title, ...words].slice(0, 3);
+      return labels.length >= 2
+        ? { layout: i === 1 ? 'flow' : 'group', caption: `Key ideas in part ${i + 1}`, items: labels.map((label, j) => ({ emoji: ['📘', '💡', '⭐'][j], label })) }
+        : null;
+    }),
     wikiTitle: '',
     funFact: sentences[sentences.length - 1],
     visual: {
