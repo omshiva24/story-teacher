@@ -465,8 +465,9 @@
     if (note) {
       note.hidden = !data.meta.fallback;
       note.textContent = data.meta.fallback
-        ? `⚡ Quick lesson from ${data.story.category}: our AI storyteller is busy right now, so this lesson uses encyclopedia facts. (code: ${data.meta.fallbackReason})`
+        ? `⚡ Quick lesson from ${data.story.category}, built from encyclopedia facts while our AI storyteller is busy.`
         : '';
+      note.title = data.meta.fallback ? `Reason: ${data.meta.fallbackReason}` : '';
     }
 
     resetJourney();
