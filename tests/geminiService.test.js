@@ -313,3 +313,30 @@ describe('AI status check', () => {
     expect(JSON.stringify(status)).not.toContain('SECRET');
   });
 });
+
+describe('overloaded model', () => {
+  const { createGeminiClient: create } = require('../src/services/geminiService');
+  test('switches to the next model when the first is overloaded', async () => {
+    const calls = [];
+    const sdk = {
+      GoogleGenAI: function GoogleGenAI() {
+        this.models = {
+          generateContent: async ({ model }) => {
+            calls.push(model);
+            if (model === 'busy-model') {
+              const err = new Error('{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}');
+              err.status = 503;
+              throw err;
+            }
+            return { text: '{"ok":true}' };
+          },
+        };
+      },
+    };
+    const client = create({ apiKey: 'k', model: 'busy-model', timeoutMs: 1000, grounding: false, sdk });
+    const result = await client.generateStoryJson({ systemInstruction: 's', prompt: 'p', schema: {} });
+    expect(result.data).toEqual({ ok: true });
+    expect(calls[0]).toBe('busy-model');
+    expect(calls.length).toBeGreaterThan(1);
+  });
+});

@@ -279,7 +279,7 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
           console.warn(`[gemini] ${modelName}: search call failed, retrying without search:`, err && err.message);
           continue;
         }
-        if (isModelUnavailable(err) || isQuotaError(err) || !isBadRequest(err)) throw err;
+        if (isModelUnavailable(err) || isQuotaError(err) || isOverloaded(err) || !isBadRequest(err)) throw err;
         console.warn(`[gemini] ${modelName}: request settings rejected, retrying more simply:`, err && err.message);
       }
     }
@@ -326,7 +326,7 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
           return result;
         } catch (err) {
           lastError = err;
-          const tryAnother = isModelUnavailable(err) || isQuotaError(err);
+          const tryAnother = isModelUnavailable(err) || isQuotaError(err) || isOverloaded(err);
           if (!tryAnother) break;
           console.warn(`[gemini] model "${modelName}" is unavailable or out of quota, trying another`);
           if (queue.length === 0 && !discovered) {
@@ -338,6 +338,12 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
       throw toFriendlyError(lastError);
     },
   };
+}
+
+/** True when Google says the model is overloaded (503 / high demand). */
+function isOverloaded(err) {
+  const message = String((err && err.message) || '');
+  return errorStatus(err) === 503 || /overloaded|UNAVAILABLE|high demand/i.test(message);
 }
 
 /** Removes anything that looks like an API key from a message. */
@@ -355,6 +361,7 @@ function keyType(key) {
 module.exports = {
   createGeminiClient,
   redact,
+  isOverloaded,
   withTimeout,
   parseJsonText,
   extractSources,
