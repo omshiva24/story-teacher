@@ -303,7 +303,7 @@ function createGeminiClient({ apiKey, model, timeoutMs, grounding = true, sdk, n
           model: name,
           ok: false,
           status: (err && (err.status || err.code)) || null,
-          message: redact(String((err && err.message) || err)).slice(0, 300),
+          message: redact(String((err && err.message) || err)).slice(0, 120),
         });
       }
     }
