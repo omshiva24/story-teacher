@@ -315,6 +315,15 @@ input[type='range'] { width: 100%; height: 44px; accent-color: var(--primary); c
   content: 'vs'; position: absolute; right: -2.1rem; top: 50%; transform: translateY(-50%);
   font-weight: 800; color: var(--primary); background: #fff; border-radius: 999px; padding: 0.1rem 0.45rem;
 }
+.board-photo { display: flex; flex-direction: column; align-items: center; gap: 0.7rem; width: 100%; }
+.board-photo img {
+  width: 100%; max-width: 420px; max-height: 240px; object-fit: contain;
+  border-radius: 16px; background: #fff; border: 4px solid #fff; box-shadow: 0 8px 22px rgba(29, 26, 57, 0.15);
+}
+#visual .board-photo { margin-bottom: 1.25rem; }
+#visual .board-photo img { max-width: 560px; max-height: 320px; }
+.board-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; }
+.board-chips li { background: #fff; color: var(--primary-dark); font-weight: 800; border-radius: 999px; padding: 0.3rem 0.85rem; box-shadow: 0 3px 8px rgba(76, 47, 196, 0.12); }
 .board-emoji { font-size: 4rem; letter-spacing: 0.4rem; text-align: center; animation: bob 3s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-8px); } }
 .board-caption { text-align: center; font-weight: 700; color: var(--primary-dark); }

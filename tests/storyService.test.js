@@ -108,11 +108,11 @@ describe('topic photo', () => {
     expect(story.storyParts).toHaveLength(3);
   });
 
-  test('no lookup when the AI gives no title', async () => {
+  test('when the AI gives no page name, it searches by the topic itself', async () => {
     const { service, findTopicImage } = setup(makeAiResult({ wikiTitle: '' }));
     const { story } = await service.createStory({ topic: 'Photosynthesis', age: 9, name: '' });
-    expect(findTopicImage).not.toHaveBeenCalled();
-    expect(story.topicImage).toBe(null);
+    expect(findTopicImage.mock.calls.map((c) => c[0])).toEqual(['Photosynthesis']);
+    expect(story.topicImage).toEqual(IMAGE);
   });
 
   test('each story part comes with its own diagram', async () => {
@@ -191,5 +191,16 @@ describe('personalize', () => {
     const copy = personalize(original, 'Om');
     expect(copy).toEqual({ a: 'Om runs', list: ['Om', 3], nested: { b: 'hi Om' } });
     expect(original.a).toBe('{{HERO}} runs');
+  });
+});
+
+describe('topic photo fallback', () => {
+  test('if the AI page has no photo, it searches by the topic as typed', async () => {
+    const IMG = { imageUrl: 'https://upload.wikimedia.org/x.jpg', pageUrl: '', title: 'Volcano', description: '' };
+    const findTopicImage = jest.fn(async (title) => (title === 'volcanoes' ? IMG : null));
+    const { service } = setup(makeAiResult({ wikiTitle: 'Wrong Page' }), findTopicImage);
+    const { story } = await service.createStory({ topic: 'volcanoes', age: 9, name: '' });
+    expect(findTopicImage.mock.calls.map((c) => c[0])).toEqual(['Wrong Page', 'volcanoes']);
+    expect(story.topicImage).toEqual(IMG);
   });
 });

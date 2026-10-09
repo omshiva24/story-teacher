@@ -515,8 +515,42 @@
    * Falls back to the scene emojis when the AI gave no diagram.
    * @param {number} index - Story part index.
    */
+  /** True when the topic has a real photo from Wikimedia. */
+  function hasTopicPhoto() {
+    const image = state.story.topicImage;
+    return Boolean(image && typeof image.imageUrl === 'string' && image.imageUrl.startsWith('https://upload.wikimedia.org/'));
+  }
+
+  /**
+   * The real topic photo with key-word chips under it. Used for the quick
+   * lesson and whenever the AI gave no diagram for a part.
+   * @param {string[]} labels
+   * @returns {HTMLElement}
+   */
+  function buildPhotoBoard(labels) {
+    const wrap = createEl('div', { className: 'board-photo' });
+    const img = document.createElement('img');
+    img.src = state.story.topicImage.imageUrl;
+    img.alt = `Photo: ${state.story.topicImage.title}`;
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => img.remove());
+    wrap.appendChild(img);
+    if (labels.length > 0) {
+      const chips = createEl('ul', { className: 'board-chips' });
+      labels.forEach((label) => chips.appendChild(createEl('li', { text: label })));
+      wrap.appendChild(chips);
+    }
+    return wrap;
+  }
+
   function renderPartBoard(index) {
     const visual = state.story.partVisuals && state.story.partVisuals[index];
+    if (hasTopicPhoto() && (state.meta.fallback || !visual)) {
+      const labels = visual ? visual.items.map((item) => item.label).filter((l) => l !== state.story.topicImage.title) : [];
+      els.boardItems.replaceChildren(buildPhotoBoard(labels));
+      els.boardCaption.textContent = labels.length > 0 ? `Key ideas in part ${index + 1}` : state.story.topicImage.title;
+      return;
+    }
     if (!visual) {
       const emoji = createEl('div', { className: 'board-emoji', text: state.story.sceneEmojis[index] || '📖✨' });
       emoji.setAttribute('aria-hidden', 'true');
@@ -678,7 +712,10 @@
   function startVisual() {
     const { visual, funFact } = state.story;
     els.visualHeading.textContent = visual ? visual.title : 'A fun fact';
-    els.visual.replaceChildren(...(visual ? [visual.type === 'cycle' ? renderCycle(visual) : renderCards(visual)] : []));
+    const blocks = [];
+    if (hasTopicPhoto() && (state.meta.fallback || !visual)) blocks.push(buildPhotoBoard([]));
+    if (visual) blocks.push(visual.type === 'cycle' ? renderCycle(visual) : renderCards(visual));
+    els.visual.replaceChildren(...blocks);
     els.funFactBox.hidden = !funFact;
     els.funFact.textContent = funFact;
     els.toGameBtn.replaceChildren(document.createTextNode(state.story.game ? 'Play the game ' : 'Take the quiz '), createEl('span', { text: state.story.game ? '🧩' : '✅' }));

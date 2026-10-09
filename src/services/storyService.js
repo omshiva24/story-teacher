@@ -77,7 +77,7 @@ function createStoryService({ aiClient, cache, findTopicImage, findArticle }) {
         sources: article.pageUrl ? [{ title: `${article.site}: ${article.title}`, url: article.pageUrl }] : [],
         topicImage: article.imageUrl
           ? { imageUrl: article.imageUrl, pageUrl: article.pageUrl, title: article.title, description: '' }
-          : null,
+          : (await lookUpImage(article.title)) || (await lookUpImage(topic)),
       };
     } catch (err) {
       console.warn('[fallback] could not build a lesson:', err && err.message);
@@ -141,7 +141,8 @@ function createStoryService({ aiClient, cache, findTopicImage, findArticle }) {
     return {
       ...validated,
       sources: Array.isArray(sources) ? sources : [],
-      topicImage: await lookUpImage(validated.wikiTitle),
+      // The AI's suggested page first, then the topic itself as typed.
+      topicImage: (await lookUpImage(validated.wikiTitle)) || (await lookUpImage(topic)),
     };
   }
 
