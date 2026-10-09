@@ -39,7 +39,7 @@ function createStoryRouter({ storyService, checkAiStatus }) {
         story = { ...(story || {}), lastAiError: storyService.getLastAiError() };
       }
       res.set('Cache-Control', 'no-store');
-      res.json({ ...statusCache.value, story });
+      res.json({ story, ...statusCache.value });
     }),
   );
 
