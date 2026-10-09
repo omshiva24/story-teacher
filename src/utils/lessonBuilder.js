@@ -77,6 +77,49 @@ function buildQuestion({ sentence, conceptId, answer, pool, optionsCount, index 
 }
 
 /**
+ * A short clue: the sentence with the word blanked out, trimmed around the gap.
+ * @param {string} sentence
+ * @param {string} word
+ * @returns {string} At most about 85 characters.
+ */
+function makeClue(sentence, word) {
+  const gapped = sentence.replace(new RegExp(`\\b${word}\\b`), '___').replace(/[.!?]$/, '');
+  if (gapped.length <= 85) return gapped;
+  const at = gapped.indexOf('___');
+  const start = Math.max(0, Math.min(at - 40, gapped.length - 80));
+  const piece = gapped.slice(start, start + 80);
+  return `${start > 0 ? '…' : ''}${piece.trim()}…`;
+}
+
+/**
+ * Matching game for the backup lesson: each word goes with the sentence it
+ * completes. Uses sentences the quiz does not use, when there are enough.
+ * @param {string[]} sentences
+ * @param {Set<string>} quizSentences
+ * @param {Set<string>} avoid - Topic words.
+ * @returns {object|null}
+ */
+function buildGame(sentences, quizSentences, avoid) {
+  const pick = (pool) => {
+    const pairs = [];
+    const used = new Set();
+    for (const sentence of pool) {
+      const word = pickKeyword(sentence, avoid);
+      if (!word) continue;
+      const stem = word.toLowerCase().replace(/(es|s)$/, '');
+      if (used.has(stem)) continue;
+      used.add(stem);
+      pairs.push({ term: word.charAt(0).toUpperCase() + word.slice(1), emoji: '', match: makeClue(sentence, word) });
+      if (pairs.length === 4) break;
+    }
+    return pairs;
+  };
+  let pairs = pick(sentences.filter((s) => !quizSentences.has(s)));
+  if (pairs.length < 3) pairs = pick(sentences);
+  return pairs.length >= 3 ? { instructions: 'Match each word with the sentence it completes.', pairs } : null;
+}
+
+/**
  * Builds a lesson from an article.
  * @param {{ article: { title: string, text: string, pageUrl: string, imageUrl: string, site: string }, band: object }} params
  * @returns {object|null} A validated story, or null if the text is too short.
@@ -101,10 +144,12 @@ function buildFallbackLesson({ article, band }) {
   const allWords = sentences.flatMap((s) => (s.match(/[A-Za-z][A-Za-z-]{4,}/g) || []).filter((w) => !STOP_WORDS.has(w.toLowerCase())));
   const keyConcepts = [];
   const quiz = [];
+  const quizSentences = new Set();
   parts.forEach((group, i) => {
     const sentence = group.find((s) => pickKeyword(s, avoid)) || group[0];
     const answer = pickKeyword(sentence, avoid);
     if (!answer) return;
+    quizSentences.add(sentence);
     const id = `c${i + 1}`;
     keyConcepts.push({
       id,
@@ -142,7 +187,7 @@ function buildFallbackLesson({ article, band }) {
       title: `${title} in three ideas`,
       items: keyConcepts.map((concept, i) => ({ label: concept.name, emoji: ['1️⃣', '2️⃣', '3️⃣'][i], detail: parts[i][0] })),
     },
-    game: null,
+    game: buildGame(sentences, quizSentences, avoid),
     keyConcepts,
     quiz,
     nextChallenge: `Find one more fact about ${title} with a grown-up and add it to the story.`,

@@ -45,7 +45,7 @@ describe('buildFallbackLesson', () => {
     });
     expect(lesson.keyConcepts.length).toBe(3);
     expect(lesson.visual.type).toBe('steps');
-    expect(lesson.game).toBe(null);
+    expect(lesson.game.pairs.length).toBeGreaterThan(2);
   });
 
   test('younger children get shorter parts', () => {
@@ -64,5 +64,19 @@ describe('buildFallbackLesson', () => {
 
   test('returns null when the text is too short', () => {
     expect(buildFallbackLesson({ article: { ...ARTICLE, text: 'Too short.' }, band: getBand(9) })).toBe(null);
+  });
+});
+
+describe('backup lesson matching game', () => {
+  test('has 3 or 4 pairs with unique words, each clue blanks its own word', () => {
+    const lesson = buildFallbackLesson({ article: ARTICLE, band: getBand(10) });
+    expect(lesson.game).not.toBe(null);
+    const terms = lesson.game.pairs.map((p) => p.term.toLowerCase().replace(/(es|s)$/, ''));
+    expect(new Set(terms).size).toBe(terms.length);
+    expect(lesson.game.pairs.length).toBeGreaterThan(2);
+    lesson.game.pairs.forEach((p) => {
+      expect(p.match).toContain('___');
+      expect(p.match.toLowerCase()).not.toContain(p.term.toLowerCase());
+    });
   });
 });
