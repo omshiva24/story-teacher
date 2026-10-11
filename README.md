@@ -4,7 +4,7 @@
 
 **Learn anything through a story a child won't want to stop reading, then find out whether it worked.**
 
-Search any topic, the way you would search Google: space, animals, maths, history, famous people, or how phones work. Story Teacher turns it into a story made for the child's age (play school to Class 12), a picture of how it works, a matching game, a quiz told inside the story, and a report for parents and teachers. Facts are checked with Google Search, and the sources are shown in the report.
+Search any topic, the way you would search Google: space, animals, maths, history, famous people, or how phones work. Story Teacher turns it into a story made for the child's age (play school to Class 12), read aloud in a female or male voice, a narrated story video with captions, a picture of how it works with real animations from Wikipedia, a matching game, a quiz told inside the story, and a report for parents and teachers. Facts are checked with Google Search, and the sources are shown in the report.
 
 **Live app:** https://story-teacher.vercel.app
 **Repository:** https://github.com/omshiva24/story-teacher
@@ -19,7 +19,7 @@ Search any topic, the way you would search Google: space, animals, maths, histor
 | **Code quality** | Small single-purpose modules (`routes`, `services`, `utils`, `middleware`), dependency injection for testability, JSDoc on every function, one source of truth for age bands and scoring shared by server and browser, ESLint enforced in CI. |
 | **Security** | Server-side validation, safety filter, prompt-injection defence, validated AI output, strict CSP, Helmet headers, Permissions-Policy, rate limiting, no `innerHTML`, secrets only in environment variables. See [SECURITY.md](SECURITY.md). |
 | **Efficiency** | One AI call per story, in-memory LRU cache by topic + age band (the child's name is added after caching), Google Search paused after quota errors, compression, static caching, no frontend framework, images drawn in the browser from small JSON. |
-| **Testing** | 200+ Jest + supertest tests across 14 files: validation, safety, age bands, prompts, AI-output validation, Gemini fallback and quota handling, Wikipedia backup, scoring, cache, API status codes and headers, plus static accessibility/security checks of the HTML. The real AI is never called (mocked). Runs on every push in [GitHub Actions](https://github.com/omshiva24/story-teacher/actions). |
+| **Testing** | 245+ Jest + supertest tests across 17 files: validation, safety, age bands, prompts, AI-output validation, Gemini fallback and quota handling, Wikipedia backup, scoring, cache, API status codes and headers, plus static accessibility/security checks of the HTML. The real AI is never called (mocked). Runs on every push in [GitHub Actions](https://github.com/omshiva24/story-teacher/actions). |
 | **Accessibility** | WCAG 2.1 AA: semantic HTML, labels, skip link, keyboard play everywhere, focus management, `aria-live` announcements, `aria-current` steps, 4.5:1 contrast, text-size toggle, reduced motion, read-aloud, no colour-only signals. Checked in `tests/frontend.static.test.js`. |
 
 ## Architecture
@@ -40,36 +40,46 @@ flowchart LR
 
 ## Demo
 
-![Story Teacher demo: search, story with live pictures, game, quiz and report](docs/demo.gif)
+![Story Teacher demo: search, story video with captions, storybook, picture, game, quiz and report](docs/demo.gif)
 
 [Watch the demo as a video (MP4)](docs/demo.mp4)
 
 ## Screenshots
 
 > Sample story: **Photosynthesis**, age 9 (Class 4), hero **Meera**.
+> The screenshots and demo were captured on a test machine that cannot load Wikimedia, so the real topic photo and the
+> "See it for real" animations are not shown in them. Open the [live app](https://story-teacher.vercel.app) to see those.
 
 ### Home: search any topic
-Search box, age slider from Play school to Class 12, the child as hero, and 8 "Explore ideas" worlds.
+A sky-and-hills storybook look. Search box, age slider from Play school to Class 12, the child as hero, a She / He voice switch, and 8 "Not sure what to pick?" worlds.
 
 <img src="docs/screenshots/01-home.png" alt="Home: search any topic" width="860">
 
-### Story part 1: a picture for what the part explains
-Each story part comes with its own diagram. Here: a plant in the dark vs in the sun.
+### Story as an open book, part 1
+The picture page on the left, the story page on the right, and a big "Watch the story video" button.
 
-<img src="docs/screenshots/02-story-part1-compare.png" alt="Story part 1: a picture for what the part explains" width="860">
+<img src="docs/screenshots/02-story-part1-compare.png" alt="Story part 1 in an open-book layout" width="860">
 
 ### Story part 2: a step-by-step flow
-Sunlight ➜ water ➜ leaf kitchen ➜ plant food. Tiles pop in one by one as the part appears.
+Sunlight ➜ water ➜ leaf kitchen ➜ plant food. Press **Listen** and each word lights up as it is read.
 
 <img src="docs/screenshots/03-story-part2-flow.png" alt="Story part 2: a step-by-step flow" width="860">
 
 ### Story part 3: a group of ideas
-What a happy plant needs.
 
 <img src="docs/screenshots/04-story-part3-group.png" alt="Story part 3: a group of ideas" width="860">
 
+### Story video: narrated scenes with captions
+Works for any topic. The narrator (female or male voice) reads each scene, captions follow the words, and pictures appear as the story is told.
+
+<img src="docs/screenshots/18-story-video-title.png" alt="Story video: title scene" width="860">
+
+<img src="docs/screenshots/19-story-video-scene.png" alt="Story video: a story part with pictures and captions" width="860">
+
+<img src="docs/screenshots/20-story-video-end.png" alt="Story video: the end, continue to the picture" width="860">
+
 ### Picture of the topic: auto-drawn cycle diagram
-Drawn in the browser as SVG, with a text list for screen readers and a "Did you know?" fact.
+Drawn in the browser as SVG, with a text list for screen readers and a "Did you know?" fact. Below it, **See it for real** shows real animations, short videos and diagrams from Wikipedia and Wikimedia Commons, credited with artist and licence. Examples from the live app: an [animated photosynthesis diagram](https://commons.wikimedia.org/wiki/File:Photosynthesis_(animated).gif), [atoms in a solid](https://commons.wikimedia.org/wiki/File:Gif_-AtomosSolido_01.gif) for States of matter, an [animated Pythagoras proof](https://commons.wikimedia.org/wiki/File:Pythag_anim.gif), and a [3D video of blood flowing through the heart](https://commons.wikimedia.org/wiki/File:Schematic_3D_illustration_of_blood_flow_through_the_heart.ogv).
 
 <img src="docs/screenshots/05-picture-cycle.png" alt="Picture of the topic: auto-drawn cycle diagram" width="860">
 
@@ -98,7 +108,7 @@ Score, understanding level, game result, ideas understood vs to practise, an act
 <img src="docs/screenshots/10-parent-teacher-report.png" alt="Report for parents and teachers" width="860">
 
 ### Age 4 (LKG): read-along story
-Very short sentences, bigger text, and a tip for grown-ups to read aloud together.
+Very short sentences, bigger text, and a tip for grown-ups to watch the story video together.
 
 <img src="docs/screenshots/11-age4-story-read-along.png" alt="Age 4 (LKG): read-along story" width="860">
 
@@ -117,13 +127,13 @@ Checked on the server before the AI is called.
 <img src="docs/screenshots/14-safety-filter.png" alt="Safety: unsafe topics are blocked" width="860">
 
 ### Always an answer: quick lesson from Wikipedia
-If the AI is busy, a lesson is built from Simple English Wikipedia (younger children) or Wikipedia (teens).
+If the AI is busy, a lesson is built from Simple English Wikipedia (younger children) or Wikipedia (teens), with picture tiles of the real things named in the text.
 
 <img src="docs/screenshots/15-backup-lesson-wikipedia.png" alt="Always an answer: quick lesson from Wikipedia" width="860">
 
 ### On phones
 
-<img src="docs/screenshots/16-mobile-home.png" alt="Mobile home screen" width="280"> <img src="docs/screenshots/17-mobile-story.png" alt="Mobile story screen" width="280">
+<img src="docs/screenshots/16-mobile-home.png" alt="Mobile home screen" width="260"> <img src="docs/screenshots/17-mobile-story.png" alt="Mobile story screen" width="260"> <img src="docs/screenshots/21-mobile-story-video.png" alt="Mobile story video" width="260">
 
 ## Features
 
