@@ -94,6 +94,22 @@
     printBtn: $('print-btn'),
     restartBtn: $('restart-btn'),
     confetti: $('confetti'),
+    watchBtn: $('watch-btn'),
+    mediaBox: $('media-box'),
+    mediaMoving: $('media-moving'),
+    mediaPictures: $('media-pictures'),
+    theatre: $('theatre'),
+    thTitle: $('th-title'),
+    thProgress: $('th-progress'),
+    thBg: $('th-bg'),
+    thScene: $('th-scene'),
+    thCaption: $('th-caption'),
+    thPlay: $('th-play'),
+    thPrev: $('th-prev'),
+    thNext: $('th-next'),
+    thCc: $('th-cc'),
+    thClose: $('th-close'),
+    thCount: $('th-count'),
   };
 
   const state = {
@@ -105,6 +121,7 @@
     stars: { story: 0, game: 0, quiz: 0 },
     totalStars: 0,
     game: null,
+    media: null,
   };
 
   /* ---------- Small helpers ---------- */
@@ -224,50 +241,379 @@
     });
   }
 
-  /* ---------- Read aloud (Web Speech API) ---------- */
+  /* ---------- Narrator: natural voice first, device voice as backup ---------- */
 
-  const speech = (function createSpeech() {
-    const supported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  const NARRATORS = { female: { name: 'Asha', face: '👩🏽' }, male: { name: 'Arjun', face: '👨🏽' } };
+  // Voice names that are female or male on common systems (Windows, macOS, Android, Chrome).
+  const FEMALE_VOICE = /female|neerja|aria|jenny|sonia|libby|samantha|karen|moira|tessa|veena|zira|heera|swara|kalpana|lekha|natasha|hazel|emma|ava|michelle|salli|joanna|kendra|ivy|raveena|aditi|google us english/i;
+  const MALE_VOICE = /(^|[^e])male|prabhat|guy|davis|ryan|thomas|daniel|alex|rishi|ravi|david|mark|george|james|brian|matthew|hemant|madhur/i;
+
+  const narrator = (function createNarrator() {
+    const deviceVoices = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    const audioCache = new Map(); // "voice|text" -> Promise<object URL>
+    let gender = 'female';
+    let naturalOffUntil = 0;
+    let token = 0;
+    let current = null; // { pause, resume, stop }
+
+    try {
+      gender = localStorage.getItem('st-voice') === 'male' ? 'male' : 'female';
+    } catch {
+      /* storage may be blocked */
+    }
+
+    /** Scores a device voice: natural/neural English voices of the chosen gender win. */
+    function scoreVoice(voice) {
+      if (!/^en/i.test(voice.lang)) return -100;
+      const name = `${voice.name} ${voice.voiceURI || ''}`;
+      const female = FEMALE_VOICE.test(name);
+      const male = !female && MALE_VOICE.test(name);
+      let score = 0;
+      if (/natural|neural|online|enhanced|premium/i.test(name)) score += 6;
+      if (/google/i.test(name)) score += 3;
+      if (/en[-_]IN/i.test(voice.lang)) score += 3;
+      else if (/en[-_](GB|US)/i.test(voice.lang)) score += 1;
+      if (gender === 'female') score += female ? 5 : male ? -8 : 0;
+      else score += male ? 5 : female ? -8 : 0;
+      return score;
+    }
+
+    function bestDeviceVoice() {
+      const voices = deviceVoices ? window.speechSynthesis.getVoices() : [];
+      return voices.reduce((best, v) => (!best || scoreVoice(v) > scoreVoice(best) ? v : best), null);
+    }
+
+    /** Fetches natural narration (WAV) from the server; cached per text and voice. */
+    function naturalAudio(text) {
+      const key = `${gender}|${text}`;
+      if (!audioCache.has(key)) {
+        const request = fetch('/api/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, voice: gender }),
+        }).then(async (response) => {
+          if (!response.ok) throw new Error('voice unavailable');
+          return URL.createObjectURL(await response.blob());
+        });
+        request.catch(() => audioCache.delete(key));
+        audioCache.set(key, request);
+      }
+      return audioCache.get(key);
+    }
+
+    /** Starts fetching narration early, so the next scene starts without a wait. */
+    function prefetch(text) {
+      if (text && Date.now() >= naturalOffUntil) naturalAudio(chunkText(text)[0].text).catch(() => {});
+    }
+
+    function withTimeout(promise, ms) {
+      return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+    }
+
+    function young() {
+      return Boolean(state.meta && isYoungReader(state.meta.age));
+    }
+
+    /** Plays natural audio; reports progress as an estimated character position. */
+    function playAudio(url, text, hooks) {
+      const audio = new Audio(url);
+      audio.playbackRate = young() ? 0.95 : 1;
+      audio.addEventListener('timeupdate', () => {
+        if (audio.duration > 0) hooks.onProgress(Math.floor((text.length * audio.currentTime) / audio.duration));
+      });
+      audio.addEventListener('ended', () => hooks.onEnd());
+      audio.addEventListener('error', () => hooks.onEnd());
+      return {
+        start: () => audio.play(),
+        pause: () => audio.pause(),
+        resume: () => audio.play().catch(() => {}),
+        stop: () => {
+          audio.pause();
+          audio.removeAttribute('src');
+        },
+      };
+    }
+
+    /** Speaks with the best device voice, word by word. */
+    function playDevice(text, hooks) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voice = bestDeviceVoice();
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice ? voice.lang : 'en-IN';
+      utterance.rate = young() ? 0.88 : 0.97;
+      // No male voice on this device? Lower the pitch so "Arjun" still sounds different.
+      const voiceIsMale = voice && !FEMALE_VOICE.test(voice.name) && MALE_VOICE.test(voice.name);
+      utterance.pitch = gender === 'male' ? (voiceIsMale ? 1 : 0.7) : 1.08;
+      utterance.onboundary = (event) => hooks.onProgress(event.charIndex);
+      utterance.onend = () => hooks.onEnd();
+      utterance.onerror = () => hooks.onEnd();
+      return {
+        start: () => window.speechSynthesis.speak(utterance),
+        pause: () => window.speechSynthesis.pause(),
+        resume: () => window.speechSynthesis.resume(),
+        stop: () => {
+          utterance.onend = null;
+          window.speechSynthesis.cancel();
+        },
+      };
+    }
+
+    /** No speech at all: still moves captions along at a reading pace. */
+    function playSilent(text, hooks) {
+      const total = Math.max(2500, text.split(/\s+/).length * 340);
+      let elapsed = 0;
+      let timer = null;
+      const tick = () => {
+        elapsed += 200;
+        hooks.onProgress(Math.floor((text.length * elapsed) / total));
+        if (elapsed >= total) {
+          clearInterval(timer);
+          hooks.onEnd();
+        }
+      };
+      return {
+        start: () => {
+          timer = setInterval(tick, 200);
+        },
+        pause: () => clearInterval(timer),
+        resume: () => {
+          clearInterval(timer);
+          timer = setInterval(tick, 200);
+        },
+        stop: () => clearInterval(timer),
+      };
+    }
+
+    function stop() {
+      token += 1;
+      if (current) current.stop();
+      current = null;
+    }
+
+    /**
+     * Splits text into pieces of whole sentences (about 600 characters at most),
+     * so each audio clip stays small and the first one arrives quickly.
+     * @returns {{ start: number, text: string }[]}
+     */
+    function chunkText(text, max = 600) {
+      const chunks = [];
+      const pattern = /[^.!?]+[.!?]*["”’)]*\s*|.+$/g;
+      let chunk = { start: 0, text: '' };
+      let match;
+      while ((match = pattern.exec(text)) !== null && match[0].length > 0) {
+        let piece = match[0];
+        let pieceStart = match.index;
+        while (piece.length > max) {
+          const cut = piece.lastIndexOf(' ', max) > 0 ? piece.lastIndexOf(' ', max) : max;
+          if (chunk.text.trim()) chunks.push(chunk);
+          chunks.push({ start: pieceStart, text: piece.slice(0, cut) });
+          piece = piece.slice(cut);
+          pieceStart += cut;
+          chunk = { start: pieceStart, text: '' };
+        }
+        if (chunk.text.length + piece.length > max && chunk.text.trim()) {
+          chunks.push(chunk);
+          chunk = { start: pieceStart, text: '' };
+        }
+        if (!chunk.text) chunk.start = pieceStart;
+        chunk.text += piece;
+      }
+      if (chunk.text.trim()) chunks.push(chunk);
+      return chunks.map((c) => ({ start: c.start, text: c.text.trimEnd() })).filter((c) => c.text.trim());
+    }
+
+    /**
+     * Reads text aloud, piece by piece.
+     * @param {string} text
+     * @param {{ onWaiting?: Function, onStart?: Function, onProgress?: Function, onEnd?: Function, silent?: boolean }} hooks
+     */
+    function speak(text, hooks = {}) {
+      stop();
+      const mine = token;
+      const chunks = chunkText(text);
+      let useNatural = !hooks.silent && Date.now() >= naturalOffUntil;
+      let started = false;
+
+      async function playChunk(k) {
+        if (mine !== token) return;
+        if (k >= chunks.length) {
+          current = null;
+          if (hooks.onEnd) hooks.onEnd();
+          return;
+        }
+        const chunk = chunks[k];
+        const chunkHooks = {
+          onProgress: (i) => mine === token && hooks.onProgress && hooks.onProgress(chunk.start + i),
+          onEnd: () => mine === token && playChunk(k + 1),
+        };
+        let player = null;
+        if (useNatural) {
+          if (!started && hooks.onWaiting) hooks.onWaiting();
+          try {
+            const url = await withTimeout(naturalAudio(chunk.text), 14000);
+            if (mine !== token) return;
+            if (chunks[k + 1]) prefetch(chunks[k + 1].text);
+            player = playAudio(url, chunk.text, chunkHooks);
+            current = player;
+            await player.start();
+          } catch {
+            if (mine !== token) return;
+            if (player) player.stop();
+            player = null;
+            useNatural = false;
+            naturalOffUntil = Date.now() + 5 * 60 * 1000; // try the natural voice again later
+          }
+        }
+        if (mine !== token) return;
+        if (!player) {
+          player = !hooks.silent && deviceVoices ? playDevice(chunk.text, chunkHooks) : playSilent(chunk.text, chunkHooks);
+          current = player;
+          player.start();
+        }
+        if (!started) {
+          started = true;
+          if (hooks.onStart) hooks.onStart();
+        }
+      }
+
+      if (chunks.length === 0) {
+        if (hooks.onEnd) hooks.onEnd();
+        return;
+      }
+      playChunk(0);
+    }
+
+    function setGender(value) {
+      gender = value === 'male' ? 'male' : 'female';
+      try {
+        localStorage.setItem('st-voice', gender);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (deviceVoices) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.addEventListener('voiceschanged', () => window.speechSynthesis.getVoices());
+    }
+
+    return {
+      speak,
+      stop,
+      prefetch,
+      pause: () => current && current.pause(),
+      resume: () => current && current.resume(),
+      setGender,
+      get gender() {
+        return gender;
+      },
+      get info() {
+        return NARRATORS[gender];
+      },
+    };
+  })();
+
+  /**
+   * Turns a paragraph into word spans so the word being read can light up.
+   * Each span remembers where it starts in the text.
+   * @param {HTMLElement} target
+   * @param {string} text
+   */
+  function renderReadableText(target, text) {
+    const nodes = [];
+    const pattern = /\S+/g;
+    let last = 0;
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > last) nodes.push(document.createTextNode(text.slice(last, match.index)));
+      const span = createEl('span', { className: 'w', text: match[0] });
+      span.dataset.start = String(match.index);
+      nodes.push(span);
+      last = match.index + match[0].length;
+    }
+    if (last < text.length) nodes.push(document.createTextNode(text.slice(last)));
+    target.replaceChildren(...nodes);
+  }
+
+  /** Lights up the word at a character position. */
+  function highlightWord(target, charIndex) {
+    let found = null;
+    target.querySelectorAll('.w').forEach((span) => {
+      if (Number(span.dataset.start) <= charIndex) found = span;
+    });
+    target.querySelectorAll('.w.on').forEach((span) => span !== found && span.classList.remove('on'));
+    if (found) found.classList.add('on');
+  }
+
+  /** "Listen" / "Read question" buttons. */
+  const speech = (function createSpeechButtons() {
     let activeButton = null;
 
     function resetButton() {
       if (!activeButton) return;
       activeButton.setAttribute('aria-pressed', 'false');
+      activeButton.removeAttribute('aria-busy');
       activeButton.querySelector('.btn-label').textContent = activeButton.dataset.label;
       activeButton = null;
+      els.storyText.querySelectorAll('.w.on').forEach((span) => span.classList.remove('on'));
     }
 
     function stop() {
-      if (supported) window.speechSynthesis.cancel();
+      narrator.stop();
       resetButton();
     }
 
-    function toggle(button, text) {
+    function toggle(button, text, highlightTarget) {
       if (activeButton === button) {
         stop();
         return;
       }
       stop();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-IN';
-      utterance.rate = state.meta && isYoungReader(state.meta.age) ? 0.85 : 0.95;
-      utterance.onend = resetButton;
-      utterance.onerror = resetButton;
       activeButton = button;
       button.setAttribute('aria-pressed', 'true');
-      button.querySelector('.btn-label').textContent = 'Stop reading';
-      window.speechSynthesis.speak(utterance);
+      const label = button.querySelector('.btn-label');
+      narrator.speak(text, {
+        onWaiting: () => {
+          button.setAttribute('aria-busy', 'true');
+          label.textContent = `${narrator.info.name} is getting ready`;
+        },
+        onStart: () => {
+          button.removeAttribute('aria-busy');
+          label.textContent = 'Stop';
+        },
+        onProgress: (i) => highlightTarget && highlightWord(highlightTarget, i),
+        onEnd: resetButton,
+      });
     }
 
     function init(buttons) {
       buttons.forEach((button) => {
         button.dataset.label = button.querySelector('.btn-label').textContent;
-        if (!supported) button.hidden = true;
       });
     }
 
     return { toggle, stop, init };
   })();
+
+  /** Narrator picker in the header (Asha or Arjun). */
+  function initNarratorPicker() {
+    const buttons = document.querySelectorAll('.narrator-btn');
+    const apply = () => {
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.voice === narrator.gender)));
+      const sub = $('watch-sub');
+      if (sub) sub.textContent = `Narrated by ${narrator.info.name}, with captions`;
+      $('th-face').textContent = narrator.info.face;
+    };
+    buttons.forEach((button) =>
+      button.addEventListener('click', () => {
+        speech.stop();
+        narrator.setGender(button.dataset.voice);
+        apply();
+        if (!els.theatre.hidden) theatre.replayScene();
+      }),
+    );
+    apply();
+  }
 
   /* ---------- Home: categories and surprise ---------- */
 
@@ -453,6 +799,8 @@
     state.answers = [];
     state.stars = { story: 0, game: 0, quiz: 0 };
     state.game = null;
+    state.media = null;
+    loadMedia();
 
     document.body.classList.toggle('young-reader', isYoungReader(data.meta.age));
     els.lessonH1.textContent = `Learning about ${data.meta.topic}`;
@@ -577,7 +925,7 @@
     state.partIndex = index;
     renderPartBoard(index);
     els.partHeading.textContent = `Part ${index + 1} of ${parts.length}`;
-    els.storyText.textContent = parts[index];
+    renderReadableText(els.storyText, parts[index]);
     document.querySelectorAll('.pdot').forEach((dot, i) => dot.classList.toggle('on', i <= index));
     const isLast = index === parts.length - 1;
     els.nextPartBtn.textContent = isLast ? 'I finished the story! ⭐' : 'What happens next?';
@@ -590,7 +938,12 @@
       focusHeading(els.partHeading);
       return;
     }
-    addStars('story', 1);
+    completeStory();
+  }
+
+  /** The story is finished (read or watched): one star, then the next step. */
+  function completeStory() {
+    if (state.stars.story === 0) addStars('story', 1);
     if (state.story.visual || state.story.funFact) {
       startVisual();
     } else if (state.story.game) {
@@ -718,6 +1071,7 @@
     els.visual.replaceChildren(...blocks);
     els.funFactBox.hidden = !funFact;
     els.funFact.textContent = funFact;
+    renderMedia();
     els.toGameBtn.replaceChildren(document.createTextNode(state.story.game ? 'Play the game ' : 'Take the quiz '), createEl('span', { text: state.story.game ? '🧩' : '✅' }));
     els.toGameBtn.lastChild.setAttribute('aria-hidden', 'true');
     showPanel('visual');
@@ -994,6 +1348,7 @@
 
   function restart() {
     speech.stop();
+    theatre.close();
     state.story = null;
     state.meta = null;
     document.body.classList.remove('young-reader');
@@ -1004,11 +1359,417 @@
     window.scrollTo({ top: 0 });
   }
 
+  /* ---------- Real animations, videos and pictures (Wikipedia) ---------- */
+
+  const MEDIA_HOSTS = ['https://upload.wikimedia.org/', 'https://thumb.wikimedia.org/'];
+  const isMediaUrl = (url) => typeof url === 'string' && MEDIA_HOSTS.some((host) => url.startsWith(host));
+
+  /** Loads moving pictures for the lesson in the background; the lesson never waits for it. */
+  async function loadMedia() {
+    const story = state.story;
+    const title = (story.topicImage && story.topicImage.title) || state.meta.topic;
+    try {
+      const response = await fetch(`/api/media?title=${encodeURIComponent(title.slice(0, 100))}`);
+      if (!response.ok || state.story !== story) return;
+      const data = await response.json();
+      state.media = {
+        moving: (Array.isArray(data.moving) ? data.moving : []).filter((m) => (m.kind === 'gif' ? isMediaUrl(m.src) : Array.isArray(m.sources))),
+        pictures: (Array.isArray(data.pictures) ? data.pictures : []).filter((m) => isMediaUrl(m.src)),
+      };
+      if (!els.panels.visual.hidden) renderMedia();
+    } catch {
+      /* no extra media: the lesson works without it */
+    }
+  }
+
+  /** "Source" link to the file page on Wikimedia Commons. */
+  function creditLine(item, kindLabel) {
+    const line = createEl('span', { text: `${kindLabel} · ${item.credit}${item.license ? ` · ${item.license}` : ''} · ` });
+    const wrap = document.createDocumentFragment();
+    wrap.appendChild(line);
+    if (typeof item.pageUrl === 'string' && item.pageUrl.startsWith('https://')) {
+      const link = createEl('a', { text: 'Source' });
+      link.href = item.pageUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.appendChild(createEl('span', { className: 'sr-only', text: ' (opens in a new tab)' }));
+      wrap.appendChild(link);
+    }
+    return wrap;
+  }
+
+  /**
+   * Builds the GIF image or video element for a media item.
+   * @param {object} item
+   * @param {{ autoplay?: boolean }} [options]
+   * @returns {HTMLElement}
+   */
+  function buildMediaElement(item, { autoplay = false } = {}) {
+    if (item.kind === 'gif') {
+      const img = document.createElement('img');
+      img.src = item.src;
+      img.alt = `Animation: ${item.title}`;
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      return img;
+    }
+    const video = document.createElement('video');
+    video.controls = !autoplay;
+    video.preload = autoplay ? 'auto' : 'none';
+    video.playsInline = true;
+    video.setAttribute('aria-label', `Video: ${item.title}`);
+    if (isMediaUrl(item.poster)) video.poster = item.poster;
+    if (autoplay) {
+      video.muted = true;
+      video.loop = true;
+      video.autoplay = true;
+    }
+    item.sources
+      .filter((s) => isMediaUrl(s.src))
+      .forEach((s) => {
+        const source = document.createElement('source');
+        source.src = s.src;
+        source.type = s.type;
+        video.appendChild(source);
+      });
+    return video;
+  }
+
+  function buildClip(item) {
+    const figure = createEl('figure', { className: 'clip' });
+    const frame = createEl('div', { className: 'clip-frame' });
+    const badge = createEl('span', { className: 'clip-badge', text: item.kind === 'gif' ? 'Animation' : `Video · ${Math.max(1, Math.round(item.duration / 60))} min` });
+    // Animations start only when asked if the child's device prefers less motion.
+    if (item.kind === 'gif' && reducedMotion()) {
+      const reveal = createEl('button', { className: 'clip-reveal', text: '▶ Play animation' });
+      reveal.type = 'button';
+      reveal.addEventListener('click', () => reveal.replaceWith(buildMediaElement(item)));
+      frame.append(reveal);
+    } else {
+      frame.append(buildMediaElement(item));
+    }
+    frame.append(badge);
+    const caption = createEl('figcaption');
+    caption.append(createEl('strong', { text: item.title }), creditLine(item, item.kind === 'gif' ? 'GIF' : 'Video'));
+    figure.append(frame, caption);
+    return figure;
+  }
+
+  function renderMedia() {
+    const media = state.media;
+    const hasAny = media && (media.moving.length > 0 || media.pictures.length > 0);
+    els.mediaBox.hidden = !hasAny;
+    if (!hasAny) return;
+    els.mediaMoving.replaceChildren(...media.moving.map(buildClip));
+    els.mediaPictures.replaceChildren(
+      ...media.pictures.map((item) => {
+        const li = document.createElement('li');
+        const figure = document.createElement('figure');
+        const img = document.createElement('img');
+        img.src = item.src;
+        img.alt = item.title;
+        img.loading = 'lazy';
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener('error', () => li.remove());
+        const caption = createEl('figcaption');
+        caption.append(createEl('span', { text: `${item.title}. ` }), creditLine(item, 'Picture'));
+        figure.append(img, caption);
+        li.appendChild(figure);
+        return li;
+      }),
+    );
+  }
+
+  /* ---------- Story video: narrated scenes with captions ---------- */
+
+  const theatre = (function createTheatre() {
+    let scenes = [];
+    let index = 0;
+    let playing = false;
+    let advanceTimer = null;
+    let lastFocus = null;
+    let sceneVideo = null;
+    let sceneDone = false;
+
+    /** Splits narration into sentences with their character ranges, for captions. */
+    function sentencesOf(text) {
+      const result = [];
+      const pattern = /[^.!?]+[.!?]*["”’)]*\s*/g;
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        if (match[0].trim()) result.push({ start: match.index, text: match[0].trim() });
+        if (match[0].length === 0) break;
+      }
+      return result.length > 0 ? result : [{ start: 0, text }];
+    }
+
+    function tilesFor(i) {
+      const visual = state.story.partVisuals && state.story.partVisuals[i];
+      if (visual && visual.items.length > 0) return { layout: visual.layout, items: visual.items };
+      const emojis = Array.from(String(state.story.sceneEmojis[i] || '📖✨').matchAll(/\p{Extended_Pictographic}(️|‍\p{Extended_Pictographic})*/gu)).map((m) => m[0]);
+      return { layout: 'group', items: emojis.slice(0, 3).map((emoji) => ({ emoji, label: '' })) };
+    }
+
+    function buildScenes() {
+      const { story, meta } = state;
+      const list = [{ kind: 'title', narration: `${story.title}. Let's find out about ${meta.topic}!` }];
+      story.storyParts.forEach((part, i) => list.push({ kind: 'part', part: i, narration: part }));
+      const clip = state.media && state.media.moving[0];
+      if (clip) {
+        list.push({ kind: 'clip', item: clip, narration: `Look! Here is a real ${clip.kind === 'gif' ? 'animation' : 'video'}: ${clip.title}.` });
+      }
+      if (story.funFact) list.push({ kind: 'fact', narration: `Did you know? ${story.funFact}` });
+      list.push({ kind: 'end', narration: `Well done, ${meta.hero}! Now let's see how much you remember.` });
+      return list;
+    }
+
+    function setBackground(scene) {
+      const photo = hasTopicPhoto() && (scene.kind === 'title' || scene.kind === 'fact');
+      els.thBg.className = 'th-bg';
+      els.thBg.style.backgroundImage = '';
+      void els.thBg.offsetWidth; // restart the slow zoom
+      if (photo) {
+        els.thBg.classList.add('photo');
+        els.thBg.style.backgroundImage = `url("${state.story.topicImage.imageUrl}")`;
+      } else {
+        els.thBg.classList.add(`tone-${((scene.part || 0) % 4) + 1}`);
+      }
+    }
+
+    function renderScene(scene) {
+      const nodes = [];
+      if (scene.kind === 'title') {
+        nodes.push(createEl('p', { className: 's-kicker', text: `${state.story.category} · ${formatAgeLabel(state.meta.age)}` }));
+        nodes.push(createEl('h3', { className: 's-title', text: state.story.title }));
+      } else if (scene.kind === 'part') {
+        const { layout, items } = tilesFor(scene.part);
+        nodes.push(createEl('p', { className: 's-kicker', text: `Part ${scene.part + 1} of ${state.story.storyParts.length}` }));
+        const list = createEl('ul', { className: `s-tiles s-${layout}` });
+        items.forEach((item, i) => {
+          if (layout === 'flow' && i > 0) {
+            const arrow = createEl('li', { className: 's-arrow', text: '➜' });
+            arrow.setAttribute('aria-hidden', 'true');
+            list.appendChild(arrow);
+          }
+          const li = createEl('li', { className: 's-tile' });
+          const emoji = createEl('span', { className: 'e', text: item.emoji });
+          emoji.setAttribute('aria-hidden', 'true');
+          li.append(emoji);
+          if (item.label) li.append(createEl('span', { className: 'l', text: item.label }));
+          list.appendChild(li);
+        });
+        nodes.push(list);
+      } else if (scene.kind === 'clip') {
+        const media = buildMediaElement(scene.item, { autoplay: !reducedMotion() });
+        media.classList.add('s-media');
+        sceneVideo = media.tagName === 'VIDEO' ? media : null;
+        nodes.push(media, createEl('p', { className: 's-credit', text: `${scene.item.title} · ${scene.item.credit} · Wikimedia Commons` }));
+      } else if (scene.kind === 'fact') {
+        const bulb = createEl('span', { className: 's-big-emoji', text: '💡' });
+        bulb.setAttribute('aria-hidden', 'true');
+        nodes.push(bulb, createEl('h3', { className: 's-title', text: 'Did you know?' }));
+      } else {
+        const star = createEl('span', { className: 's-big-emoji', text: '🌟' });
+        star.setAttribute('aria-hidden', 'true');
+        const actions = createEl('div', { className: 's-actions' });
+        const again = createEl('button', { className: 'btn btn-secondary', text: 'Watch again' });
+        again.type = 'button';
+        again.addEventListener('click', () => go(0));
+        const next = createEl('button', { className: 'btn btn-big', text: 'Continue to the picture' });
+        next.type = 'button';
+        next.addEventListener('click', () => {
+          close();
+          completeStory();
+        });
+        actions.append(again, next);
+        nodes.push(star, createEl('h3', { className: 's-title', text: 'The end!' }), actions);
+      }
+      els.thScene.replaceChildren(...nodes);
+    }
+
+    /** Shows the sentence being read, with the current word lit up; reveals tiles as the story goes. */
+    function onProgress(scene, charIndex) {
+      const sentence = scene.sentences.reduce((found, s) => (s.start <= charIndex ? s : found), scene.sentences[0]);
+      if (els.thCaption.dataset.start !== String(sentence.start)) {
+        els.thCaption.dataset.start = String(sentence.start);
+        renderReadableText(els.thCaption, sentence.text);
+      }
+      highlightWord(els.thCaption, charIndex - sentence.start);
+      const tiles = els.thScene.querySelectorAll('.s-tile');
+      const share = scene.narration.length > 0 ? charIndex / scene.narration.length : 1;
+      tiles.forEach((tile, i) => {
+        if (i === 0 || share >= i / tiles.length) {
+          tile.classList.add('in');
+          const arrow = tile.previousElementSibling;
+          if (arrow && arrow.classList.contains('s-arrow')) arrow.classList.add('in');
+        }
+      });
+      const bar = els.thProgress.children[index];
+      if (bar) bar.firstChild.style.width = `${Math.min(100, Math.round(share * 100))}%`;
+    }
+
+    function updateChrome() {
+      Array.from(els.thProgress.children).forEach((bar, i) => {
+        bar.classList.toggle('done', i < index);
+        bar.firstChild.style.width = i < index ? '100%' : '0';
+      });
+      els.thCount.textContent = `Scene ${index + 1} of ${scenes.length}`;
+      els.thPlay.textContent = playing ? '❚❚' : '▶';
+      els.thPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+      els.thPrev.disabled = index === 0;
+      els.thNext.disabled = index === scenes.length - 1;
+    }
+
+    function clearTimers() {
+      clearTimeout(advanceTimer);
+      advanceTimer = null;
+    }
+
+    function playScene() {
+      clearTimers();
+      narrator.stop();
+      sceneVideo = null;
+      sceneDone = false;
+      const scene = scenes[index];
+      scene.sentences = scene.sentences || sentencesOf(scene.narration);
+      setBackground(scene);
+      renderScene(scene);
+      els.thCaption.dataset.start = '';
+      els.thCaption.replaceChildren();
+      updateChrome();
+      if (reducedMotion()) els.thScene.querySelectorAll('.s-tile, .s-arrow').forEach((t) => t.classList.add('in'));
+      const nextScene = scenes[index + 1];
+      if (nextScene) narrator.prefetch(nextScene.narration);
+      if (!playing) return;
+      els.theatre.classList.add('speaking');
+      narrator.speak(scene.narration, {
+        onProgress: (i) => onProgress(scene, i),
+        onEnd: () => {
+          sceneDone = true;
+          els.theatre.classList.remove('speaking');
+          onProgress(scene, scene.narration.length);
+          if (index >= scenes.length - 1) {
+            playing = false; // the end: wait for the child to choose
+            updateChrome();
+            return;
+          }
+          if (!playing) return;
+          // Let a real video or animation play a little longer before moving on.
+          const linger = scene.kind === 'clip' ? (sceneVideo ? 8000 : 3500) : 1100;
+          advanceTimer = setTimeout(() => go(index + 1), linger);
+        },
+      });
+    }
+
+    function go(i) {
+      index = Math.max(0, Math.min(scenes.length - 1, i));
+      playing = true;
+      playScene();
+    }
+
+    function togglePlay() {
+      playing = !playing;
+      if (playing) {
+        if (sceneDone || els.thCaption.childNodes.length === 0) {
+          playScene();
+        } else {
+          narrator.resume();
+          els.theatre.classList.add('speaking');
+          if (sceneVideo) sceneVideo.play().catch(() => {});
+        }
+      } else {
+        clearTimers();
+        narrator.pause();
+        els.theatre.classList.remove('speaking');
+        if (sceneVideo) sceneVideo.pause();
+      }
+      updateChrome();
+    }
+
+    /** Keeps keyboard focus inside the player while it is open. */
+    function onKeydown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key === 'Tab') {
+        const focusable = Array.from(els.theatre.querySelectorAll('button:not([disabled]), video[controls]'));
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      if (event.target.tagName === 'BUTTON') return;
+      if (event.key === ' ') {
+        event.preventDefault();
+        togglePlay();
+      } else if (event.key === 'ArrowRight') {
+        go(index + 1);
+      } else if (event.key === 'ArrowLeft') {
+        go(index - 1);
+      }
+    }
+
+    function open() {
+      speech.stop();
+      scenes = buildScenes();
+      els.thTitle.textContent = state.story.title;
+      els.thProgress.replaceChildren(...scenes.map(() => {
+        const bar = document.createElement('span');
+        bar.appendChild(document.createElement('i'));
+        return bar;
+      }));
+      lastFocus = document.activeElement;
+      els.theatre.hidden = false;
+      document.body.style.overflow = 'hidden';
+      document.addEventListener('keydown', onKeydown);
+      els.thPlay.focus();
+      go(0);
+    }
+
+    function close() {
+      if (els.theatre.hidden) return;
+      clearTimers();
+      narrator.stop();
+      playing = false;
+      els.theatre.classList.remove('speaking');
+      els.thScene.replaceChildren(); // stops any video
+      els.theatre.hidden = true;
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKeydown);
+      if (lastFocus && document.contains(lastFocus) && !els.lesson.hidden) lastFocus.focus();
+    }
+
+    function init() {
+      els.watchBtn.addEventListener('click', open);
+      els.thClose.addEventListener('click', close);
+      els.thPlay.addEventListener('click', togglePlay);
+      els.thPrev.addEventListener('click', () => go(index - 1));
+      els.thNext.addEventListener('click', () => go(index + 1));
+      els.thCc.addEventListener('click', () => {
+        const on = els.thCc.getAttribute('aria-pressed') !== 'true';
+        els.thCc.setAttribute('aria-pressed', String(on));
+        els.thCaption.classList.toggle('off', !on);
+      });
+    }
+
+    return { init, open, close, replayScene: () => playing && playScene() };
+  })();
+
   /* ---------- Wire up ---------- */
 
   function init() {
     initTextSize();
     speech.init([els.readStoryBtn, els.readQuestionBtn]);
+    initNarratorPicker();
+    theatre.init();
     renderCategories();
     updateAgeStage();
 
@@ -1017,7 +1778,7 @@
     els.surpriseBtn.addEventListener('click', surprise);
     els.topic.addEventListener('input', clearError);
 
-    els.readStoryBtn.addEventListener('click', () => speech.toggle(els.readStoryBtn, els.storyText.textContent));
+    els.readStoryBtn.addEventListener('click', () => speech.toggle(els.readStoryBtn, els.storyText.textContent, els.storyText));
     els.nextPartBtn.addEventListener('click', onNextPart);
     els.toGameBtn.addEventListener('click', onAfterVisual);
     els.skipGameBtn.addEventListener('click', skipGame);

@@ -93,3 +93,27 @@ describe('frontend security', () => {
     expect(appJs).toContain("image.imageUrl.startsWith('https://upload.wikimedia.org/')");
   });
 });
+
+describe('narrator, story video and real media', () => {
+  test('the story video is an accessible dialog with captions and labelled controls', () => {
+    expect(html).toMatch(/id="theatre"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="th-title"/);
+    expect(html).toMatch(/id="th-caption"[^>]*aria-live="polite"/);
+    ['th-close', 'th-prev', 'th-next', 'th-play'].forEach((id) => expect(html).toMatch(new RegExp(`id="${id}"[^>]*aria-label="`)));
+    expect(appJs).toContain("event.key === 'Escape'");
+  });
+
+  test('the narrator choice is a pressed-state toggle', () => {
+    expect(html).toMatch(/class="narrator-btn" data-voice="female" aria-pressed="true"/);
+    expect(html).toMatch(/class="narrator-btn" data-voice="male" aria-pressed="false"/);
+  });
+
+  test('animations and videos come only from Wikimedia and wait when motion is reduced', () => {
+    expect(appJs).toContain("const MEDIA_HOSTS = ['https://upload.wikimedia.org/', 'https://thumb.wikimedia.org/'];");
+    expect(appJs).toContain("reveal.addEventListener('click'");
+  });
+
+  test('fonts are served by the app itself', () => {
+    expect(css).toContain("src: url('/fonts/baloo2-latin.woff')");
+    expect(html).not.toMatch(/fonts\.googleapis\.com/);
+  });
+});

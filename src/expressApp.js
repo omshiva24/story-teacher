@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { createStoryRouter } = require('./routes/storyRoutes');
+const { createMediaRouter } = require('./routes/mediaRoutes');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -19,7 +20,7 @@ require('./utils/scoring');
  * @param {{ storyService: object, config: object }} deps
  * @returns {import('express').Express}
  */
-function createApp({ storyService, config, checkAiStatus }) {
+function createApp({ storyService, config, checkAiStatus, findMedia, tts }) {
   const app = express();
   const staticMaxAge = config.nodeEnv === 'production' ? '1h' : 0;
 
@@ -34,7 +35,9 @@ function createApp({ storyService, config, checkAiStatus }) {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
           styleSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'https://upload.wikimedia.org'], // topic photos from Wikipedia only
+          // Photos, GIFs and videos from Wikimedia only; narration audio arrives as a blob.
+          imgSrc: ["'self'", 'data:', 'https://upload.wikimedia.org', 'https://thumb.wikimedia.org'],
+          mediaSrc: ["'self'", 'blob:', 'https://upload.wikimedia.org', 'https://thumb.wikimedia.org'],
           connectSrc: ["'self'"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
@@ -62,6 +65,17 @@ function createApp({ storyService, config, checkAiStatus }) {
     legacyHeaders: false,
     message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Too many stories at once. Please wait a minute.' } },
   });
+  // Pictures and narration are lighter and come in small bursts (one clip per
+  // story part), so they get their own, more generous limit.
+  const mediaLimiter = rateLimit({
+    windowMs: config.rateLimitWindowMs,
+    limit: config.rateLimitMax * 6,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: { code: 'TOO_MANY_REQUESTS', message: 'Too many requests. Please wait a minute.' } },
+  });
+  app.use(['/api/media', '/api/voice'], mediaLimiter);
+  app.use('/api', createMediaRouter({ findMedia, tts })); // answers before the story limit below
   app.use('/api', apiLimiter, createStoryRouter({ storyService, checkAiStatus }));
   app.use('/api', notFound);
 
