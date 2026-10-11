@@ -243,7 +243,7 @@
 
   /* ---------- Narrator: natural voice first, device voice as backup ---------- */
 
-  const NARRATORS = { female: { name: 'Asha', face: '👩🏽' }, male: { name: 'Arjun', face: '👨🏽' } };
+  const NARRATORS = { female: { label: 'female voice', face: '👩🏽' }, male: { label: 'male voice', face: '👨🏽' } };
   // Voice names that are female or male on common systems (Windows, macOS, Android, Chrome).
   const FEMALE_VOICE = /female|neerja|aria|jenny|sonia|libby|samantha|karen|moira|tessa|veena|zira|heera|swara|kalpana|lekha|natasha|hazel|emma|ava|michelle|salli|joanna|kendra|ivy|raveena|aditi|google us english/i;
   const MALE_VOICE = /(^|[^e])male|prabhat|guy|davis|ryan|thomas|daniel|alex|rishi|ravi|david|mark|george|james|brian|matthew|hemant|madhur/i;
@@ -341,7 +341,7 @@
       if (voice) utterance.voice = voice;
       utterance.lang = voice ? voice.lang : 'en-IN';
       utterance.rate = young() ? 0.88 : 0.97;
-      // No male voice on this device? Lower the pitch so "Arjun" still sounds different.
+      // No male voice on this device? Lower the pitch so the male voice still sounds different.
       const voiceIsMale = voice && !FEMALE_VOICE.test(voice.name) && MALE_VOICE.test(voice.name);
       utterance.pitch = gender === 'male' ? (voiceIsMale ? 1 : 0.7) : 1.08;
       utterance.onboundary = (event) => hooks.onProgress(event.charIndex);
@@ -575,7 +575,7 @@
       narrator.speak(text, {
         onWaiting: () => {
           button.setAttribute('aria-busy', 'true');
-          label.textContent = `${narrator.info.name} is getting ready`;
+          label.textContent = 'Getting the voice ready';
         },
         onStart: () => {
           button.removeAttribute('aria-busy');
@@ -595,13 +595,13 @@
     return { toggle, stop, init };
   })();
 
-  /** Narrator picker in the header (Asha or Arjun). */
+  /** Voice picker in the header: female (she) or male (he). */
   function initNarratorPicker() {
     const buttons = document.querySelectorAll('.narrator-btn');
     const apply = () => {
       buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.voice === narrator.gender)));
       const sub = $('watch-sub');
-      if (sub) sub.textContent = `Narrated by ${narrator.info.name}, with captions`;
+      if (sub) sub.textContent = `Read aloud in a ${narrator.info.label}, with captions`;
       $('th-face').textContent = narrator.info.face;
     };
     buttons.forEach((button) =>
