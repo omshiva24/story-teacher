@@ -12,6 +12,7 @@
 const { checkTopicSafety } = require('../utils/safety');
 
 const API = 'https://en.wikipedia.org/w/api.php';
+const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 const USER_AGENT = 'StoryTeacher/1.0 (educational app for children; PromptWars hackathon)';
 const MEDIA_HOSTS = ['https://upload.wikimedia.org/', 'https://thumb.wikimedia.org/'];
 const MAX_GIF_BYTES = 6 * 1024 * 1024;
@@ -20,6 +21,12 @@ const MAX_VIDEO_SECONDS = 20 * 60;
 // Site furniture that appears on every article: logos, icons, maps, flags.
 const SKIP_FILE =
   /logo|icon|symbol|flag|protection|shackle|oojs|commons-|wiktionary|wikiquote|wikibooks|wikisource|wikiversity|wikinews|wikivoyage|wikidata|portal|question_book|ambox|padlock|stub|nuvola|crystal|disambig|pog|location|locator|map_of|_map|signature|edit-|audio|speaker|sound|increase|decrease|steady|loudspeaker/i;
+
+// Real surgery, injuries and similar are too graphic for children, even on science pages.
+const GRAPHIC_FILE = /dissect|disecc|surger|surgical|transplant|autopsy|cadaver|corpse|wound|injur|blood_?loss|necro|gore|dead|death|operation|slaughter/i;
+
+// Diagrams labelled in another language ("Photosynthesis-ar.gif"); English or unlabelled ones are kept.
+const OTHER_LANGUAGE = /[-_ (]([a-z]{2,3})\)?$/;
 
 /** Removes tracking parameters and accepts only Wikimedia media hosts. */
 function safeMediaUrl(url) {
@@ -98,9 +105,11 @@ function isRelevant(item, keywords) {
  */
 function toMediaItem(page) {
   const info = page && Array.isArray(page.videoinfo) ? page.videoinfo[0] : null;
-  if (!info || SKIP_FILE.test(page.title || '')) return null;
+  if (!info || SKIP_FILE.test(page.title || '') || GRAPHIC_FILE.test(page.title || '')) return null;
   const title = captionFromTitle(page.title);
   if (!title || !checkTopicSafety(title).safe) return null;
+  const language = OTHER_LANGUAGE.exec(String(page.title).replace(/\.[a-z0-9]+$/i, ''));
+  if (language && language[1] !== 'en') return null;
 
   const meta = info.extmetadata || {};
   const base = {
@@ -114,9 +123,13 @@ function toMediaItem(page) {
   const mime = String(info.mime || '');
 
   if (mime === 'image/gif') {
+    // Wikimedia reports a duration only for GIFs that actually move.
+    const animated = Number(info.duration) > 0;
     // Small GIFs play from the original; big ones use the (animated) thumbnail.
     const src = info.size <= MAX_GIF_BYTES ? safeMediaUrl(info.url) : safeMediaUrl(info.thumburl);
-    return src && info.width >= 120 ? { kind: 'gif', src, ...base } : null;
+    if (!src || info.width < 120 || info.height < 90) return null;
+    if (animated) return { kind: 'gif', src, ...base };
+    return info.width >= 300 ? { kind: 'image', src, ...base } : null;
   }
   if (mime.startsWith('video/') || mime === 'application/ogg') {
     const sources = pickVideoSources(info.derivatives);
@@ -128,6 +141,11 @@ function toMediaItem(page) {
     const src = safeMediaUrl(info.thumburl || info.url);
     return src ? { kind: 'image', src, ...base } : null;
   }
+  // SVG diagrams are shown as the PNG that Wikimedia renders from them.
+  if (mime === 'image/svg+xml' && info.width >= 300 && info.height >= 200) {
+    const src = safeMediaUrl(info.thumburl);
+    return src && !src.endsWith('.svg') ? { kind: 'image', src, ...base } : null;
+  }
   return null;
 }
 
@@ -136,9 +154,9 @@ function toMediaItem(page) {
  * @returns {(title: string) => Promise<{ title: string, moving: object[], pictures: object[] }>}
  */
 function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch, cache = null } = {}) {
-  async function getJson(params) {
+  async function getJson(params, api = API) {
     const query = new URLSearchParams({ format: 'json', formatversion: '2', ...params });
-    const response = await fetchImpl(`${API}?${query}`, {
+    const response = await fetchImpl(`${api}?${query}`, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -158,6 +176,26 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
       viurlwidth: '640',
       viextmetadatafilter: 'Artist|LicenseShortName',
     });
+  }
+
+  /** Animations or videos about the topic on Wikimedia Commons, best matches first. */
+  async function commonsMoving(topic, filter) {
+    const data = await getJson(
+      {
+        action: 'query',
+        generator: 'search',
+        gsrsearch: `${topic} ${filter}`,
+        gsrnamespace: '6',
+        gsrlimit: '10',
+        prop: 'videoinfo',
+        viprop: 'url|mime|size|derivatives|extmetadata',
+        viurlwidth: '640',
+        viextmetadatafilter: 'Artist|LicenseShortName',
+      },
+      COMMONS_API,
+    );
+    const pages = (data && data.query && Array.isArray(data.query.pages) && data.query.pages) || [];
+    return pages.sort((a, b) => (a.index || 0) - (b.index || 0));
   }
 
   /** Best article title for a free-text topic. */
@@ -184,7 +222,18 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
       const pages = (data && data.query && Array.isArray(data.query.pages) && data.query.pages) || [];
       const keywords = topicKeywords([title, pageTitle]);
       const seen = new Set();
-      const items = pages
+      let allPages = pages;
+      // Few moving pictures in the article? Look for animations and videos on Commons too.
+      const movingInArticle = pages.map(toMediaItem).filter((i) => i && i.kind !== 'image' && isRelevant(i, keywords)).length;
+      if (movingInArticle < 2) {
+        const subject = pageTitle || title;
+        const [gifs, videos] = await Promise.all([
+          commonsMoving(subject, 'filemime:image/gif').catch(() => []),
+          commonsMoving(subject, 'filetype:video').catch(() => []),
+        ]);
+        allPages = [...pages, ...gifs.slice(0, 6), ...videos.slice(0, 4)];
+      }
+      const items = allPages
         .map(toMediaItem)
         .filter(Boolean)
         .filter((item) => isRelevant(item, keywords))

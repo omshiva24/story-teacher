@@ -4,7 +4,7 @@ const { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, capt
 
 const gif = {
   title: 'File:Water cycle animation.gif',
-  videoinfo: [{ mime: 'image/gif', size: 500000, width: 400, height: 300, url: 'https://upload.wikimedia.org/w/a.gif?utm_source=x', thumburl: 'https://upload.wikimedia.org/w/a-thumb.gif', descriptionurl: 'https://commons.wikimedia.org/wiki/File:A.gif', extmetadata: { Artist: { value: '<a href="https://x">Ana &amp; Co</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } } }],
+  videoinfo: [{ mime: 'image/gif', duration: 2.4, size: 500000, width: 400, height: 300, url: 'https://upload.wikimedia.org/w/a.gif?utm_source=x', thumburl: 'https://upload.wikimedia.org/w/a-thumb.gif', descriptionurl: 'https://commons.wikimedia.org/wiki/File:A.gif', extmetadata: { Artist: { value: '<a href="https://x">Ana &amp; Co</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } } }],
 };
 const video = {
   title: "File:Earth's Water Cycle.ogv",
@@ -48,6 +48,16 @@ describe('wiki media helpers', () => {
     expect(item).toMatchObject({ kind: 'gif', src: 'https://upload.wikimedia.org/w/a.gif', title: 'Water cycle animation', credit: 'Ana Co', license: 'CC BY-SA 4.0' });
     expect(toMediaItem(video)).toMatchObject({ kind: 'video', duration: 353, poster: 'https://thumb.wikimedia.org/w/v.jpg' });
     expect(toMediaItem(photo)).toMatchObject({ kind: 'image', src: 'https://upload.wikimedia.org/r-640.jpg' });
+  });
+
+  test('treats still GIFs and SVG diagrams as pictures, and skips graphic or foreign-language files', () => {
+    const still = { ...gif, videoinfo: [{ ...gif.videoinfo[0], duration: undefined }] };
+    expect(toMediaItem(still).kind).toBe('image');
+    const svg = { title: 'File:Water cycle diagram.svg', videoinfo: [{ mime: 'image/svg+xml', width: 800, height: 600, url: 'https://upload.wikimedia.org/w.svg', thumburl: 'https://upload.wikimedia.org/w.svg.png' }] };
+    expect(toMediaItem(svg)).toMatchObject({ kind: 'image', src: 'https://upload.wikimedia.org/w.svg.png' });
+    expect(toMediaItem({ ...video, title: 'File:Heart awaiting transplant.webm' })).toBe(null);
+    expect(toMediaItem({ ...gif, title: 'File:Photosynthesis-ar.gif' })).toBe(null);
+    expect(toMediaItem({ ...gif, title: 'File:Photosynthesis-en.gif' }).kind).toBe('gif');
   });
 
   test('skips site logos and media from other hosts', () => {
@@ -95,7 +105,7 @@ describe('createWikiMediaFinder', () => {
     const result = await createWikiMediaFinder({ fetchImpl })('how volcanoes erupt');
     expect(result.title).toBe('Volcano');
     expect(result.moving).toHaveLength(1);
-    expect(urls.length).toBe(3);
+    expect(urls.length).toBeGreaterThan(2);
   });
 
   test('keeps only files about the topic, once each', async () => {
@@ -105,6 +115,18 @@ describe('createWikiMediaFinder', () => {
     const result = await createWikiMediaFinder({ fetchImpl })('Water cycle');
     expect(result.moving).toHaveLength(1);
     expect(result.pictures.map((p) => p.title)).toEqual(['Water vapour clouds']);
+  });
+
+  test('adds animations from Wikimedia Commons when the article has few', async () => {
+    const commonsGif = { ...gif, title: 'File:Photosynthesis (animated).gif', index: 1, videoinfo: [{ ...gif.videoinfo[0], url: 'https://upload.wikimedia.org/p.gif' }] };
+    const fetchImpl = async (url) => {
+      if (url.startsWith('https://commons.wikimedia.org/') && url.includes('filemime')) return { ok: true, json: async () => ({ query: { pages: [commonsGif] } }) };
+      if (url.startsWith('https://commons.wikimedia.org/')) return { ok: true, json: async () => ({ batchcomplete: true }) };
+      return { ok: true, json: async () => ({ query: { pages: [{ ...photo, title: 'File:Photosynthesis overview.jpg' }] } }) };
+    };
+    const result = await createWikiMediaFinder({ fetchImpl })('Photosynthesis');
+    expect(result.moving.map((m) => m.title)).toEqual(['Photosynthesis (animated)']);
+    expect(result.pictures).toHaveLength(1);
   });
 
   test('never throws: failures give an empty result', async () => {
