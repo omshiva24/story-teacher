@@ -8,6 +8,17 @@ Search any topic, the way you would search Google: space, animals, maths, histor
 
 **Live app:** https://story-teacher.vercel.app
 **Repository:** https://github.com/omshiva24/story-teacher
+**Created by:** **P Om Shiva**, M.Tech CSE (2nd year), Pondicherry University · [GitHub @omshiva24](https://github.com/omshiva24)
+
+## Why I made Story Teacher
+
+In India, ASER 2024 found that only **44.8% of Class 5 children can read a Class 2 text**, and only **30.7% can do a simple division**. The children are not the problem. Every child will listen to a story till the very end, but science and maths often reach them as dry pages to memorise.
+
+I built Story Teacher so that any child, in any school, with just a phone, can turn any topic into a story made for their age, hear it in a friendly voice, watch it come alive, and then show what they understood. Parents and teachers finally see what landed and what needs another go.
+
+> **No child should fall behind because a lesson was boring. Every child deserves a story that teaches them.**
+>
+> — P Om Shiva, M.Tech CSE (2nd year), Pondicherry University
 
 ---
 
@@ -282,3 +293,9 @@ public/                index.html, styles.css, app.js
 tests/                 Jest + supertest
 deploy.sh              one-command Cloud Run deploy
 ```
+
+## Author
+
+**P Om Shiva** · M.Tech CSE (2nd year), Pondicherry University · [github.com/omshiva24](https://github.com/omshiva24)
+
+Story Teacher was designed and built by P Om Shiva. © 2026 P Om Shiva. Released under the [MIT License](LICENSE): if you reuse this code, keep the copyright notice and credit the author.

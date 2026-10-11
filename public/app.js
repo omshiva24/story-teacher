@@ -1339,7 +1339,7 @@
     renderSources(state.story.sources);
     const sourcesTitle = $('r-sources-title');
     if (sourcesTitle) sourcesTitle.textContent = state.meta.fallback ? 'Facts from' : 'Facts checked with Google Search';
-    $('r-date').textContent = `Story: “${state.story.title}” · ${new Date().toLocaleDateString('en-IN', { dateStyle: 'long' })}`;
+    $('r-date').textContent = `Story: “${state.story.title}” · ${new Date().toLocaleDateString('en-IN', { dateStyle: 'long' })} · Story Teacher by P Om Shiva, Pondicherry University`;
 
     showPanel('report');
     focusHeading(els.reportHeading);

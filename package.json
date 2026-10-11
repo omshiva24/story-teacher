@@ -38,5 +38,6 @@
       "!src/bootstrap.js",
       "!src/app.js"
     ]
-  }
+  },
+  "author": "P Om Shiva (M.Tech CSE, Pondicherry University) <https://github.com/omshiva24>"
 }
