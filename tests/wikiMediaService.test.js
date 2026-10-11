@@ -1,6 +1,6 @@
 'use strict';
 
-const { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle } = require('../src/services/wikiMediaService');
+const { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle, topicKeywords, isRelevant } = require('../src/services/wikiMediaService');
 
 const gif = {
   title: 'File:Water cycle animation.gif',
@@ -20,7 +20,7 @@ const video = {
   }],
 };
 const logo = { title: 'File:Commons-logo.svg', videoinfo: [{ mime: 'image/svg+xml', width: 1024, height: 1376, url: 'https://upload.wikimedia.org/x.svg' }] };
-const photo = { title: 'File:Rain clouds.jpg', videoinfo: [{ mime: 'image/jpeg', size: 200000, width: 1600, height: 1000, url: 'https://upload.wikimedia.org/r.jpg', thumburl: 'https://upload.wikimedia.org/r-640.jpg' }] };
+const photo = { title: 'File:Water vapour clouds.jpg', videoinfo: [{ mime: 'image/jpeg', size: 200000, width: 1600, height: 1000, url: 'https://upload.wikimedia.org/r.jpg', thumburl: 'https://upload.wikimedia.org/r-640.jpg' }] };
 const foreign = { title: 'File:Bad.gif', videoinfo: [{ mime: 'image/gif', size: 1000, width: 400, height: 300, url: 'https://evil.example.com/a.gif' }] };
 
 describe('wiki media helpers', () => {
@@ -57,6 +57,16 @@ describe('wiki media helpers', () => {
   });
 });
 
+describe('topic relevance', () => {
+  test('builds keywords that match related file names', () => {
+    expect(topicKeywords(['Solar System'])).toEqual(['solar', 'system']);
+    expect(topicKeywords(['Photosynthesis'])).toEqual(['photos']);
+    const heart = topicKeywords(['Heart']);
+    expect(isRelevant({ title: 'Blood flow through the heart' }, heart)).toBe(true);
+    expect(isRelevant({ title: 'Famous person 2025' }, heart)).toBe(false);
+  });
+});
+
 describe('createWikiMediaFinder', () => {
   test('returns moving pictures and pictures from the article, and caches them', async () => {
     let calls = 0;
@@ -79,13 +89,22 @@ describe('createWikiMediaFinder', () => {
     const fetchImpl = async (url) => {
       urls.push(url);
       if (url.includes('list=search')) return { ok: true, json: async () => ({ query: { search: [{ title: 'Volcano' }] } }) };
-      if (url.includes('titles=Volcano')) return { ok: true, json: async () => ({ query: { pages: [gif] } }) };
+      if (url.includes('titles=Volcano')) return { ok: true, json: async () => ({ query: { pages: [{ ...gif, title: 'File:Volcano eruption.gif' }] } }) };
       return { ok: true, json: async () => ({ batchcomplete: true }) };
     };
     const result = await createWikiMediaFinder({ fetchImpl })('how volcanoes erupt');
     expect(result.title).toBe('Volcano');
     expect(result.moving).toHaveLength(1);
     expect(urls.length).toBe(3);
+  });
+
+  test('keeps only files about the topic, once each', async () => {
+    const unrelated = { ...photo, title: 'File:Famous person 2025.png' };
+    const copy = { ...gif, title: 'File:Water cycle animation (copy).gif' };
+    const fetchImpl = async () => ({ ok: true, json: async () => ({ query: { pages: [gif, copy, unrelated, photo] } }) });
+    const result = await createWikiMediaFinder({ fetchImpl })('Water cycle');
+    expect(result.moving).toHaveLength(1);
+    expect(result.pictures.map((p) => p.title)).toEqual(['Water vapour clouds']);
   });
 
   test('never throws: failures give an empty result', async () => {
