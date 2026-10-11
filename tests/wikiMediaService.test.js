@@ -121,7 +121,12 @@ describe('createWikiMediaFinder', () => {
     const commonsGif = { ...gif, title: 'File:Photosynthesis (animated).gif', index: 1, videoinfo: [{ ...gif.videoinfo[0], url: 'https://upload.wikimedia.org/p.gif' }] };
     const fetchImpl = async (url) => {
       if (url.startsWith('https://commons.wikimedia.org/') && url.includes('filemime')) return { ok: true, json: async () => ({ query: { pages: [commonsGif] } }) };
-      if (url.startsWith('https://commons.wikimedia.org/')) return { ok: true, json: async () => ({ batchcomplete: true }) };
+      if (url.startsWith('https://commons.wikimedia.org/')) {
+        // A lab machine video and a still chart: neither should be shown.
+        const machine = { ...video, title: 'File:Photosynthesis meter machine.webm' };
+        const chart = { ...gif, title: 'File:Photosynthesis chart.gif', videoinfo: [{ ...gif.videoinfo[0], duration: undefined }] };
+        return { ok: true, json: async () => ({ query: { pages: [machine, chart] } }) };
+      }
       return { ok: true, json: async () => ({ query: { pages: [{ ...photo, title: 'File:Photosynthesis overview.jpg' }] } }) };
     };
     const result = await createWikiMediaFinder({ fetchImpl })('Photosynthesis');
