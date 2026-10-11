@@ -1,6 +1,6 @@
 # 📖 Story Teacher
 
-[![CI](https://github.com/omshiva24/story-teacher/actions/workflows/ci.yml/badge.svg)](https://github.com/omshiva24/story-teacher/actions/workflows/ci.yml) ![Node 20+](https://img.shields.io/badge/node-20%2B-brightgreen) ![WCAG 2.1 AA](https://img.shields.io/badge/accessibility-WCAG%202.1%20AA-blue) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+[![CI](https://github.com/omshiva24/story-teacher/actions/workflows/ci.yml/badge.svg)](https://github.com/omshiva24/story-teacher/actions/workflows/ci.yml) ![Node 20+](https://img.shields.io/badge/node-20%2B-brightgreen) ![WCAG 2.1 AA](https://img.shields.io/badge/accessibility-WCAG%202.1%20AA-blue) [![License: All rights reserved](https://img.shields.io/badge/license-All%20rights%20reserved-red)](LICENSE)
 
 **Learn anything through a story a child won't want to stop reading, then find out whether it worked.**
 
@@ -9,6 +9,7 @@ Search any topic, the way you would search Google: space, animals, maths, histor
 **Live app:** https://story-teacher.vercel.app
 **Repository:** https://github.com/omshiva24/story-teacher
 **Created by:** **P Om Shiva**, M.Tech CSE (2nd year), Pondicherry University · [GitHub @omshiva24](https://github.com/omshiva24)
+**© 2026 P Om Shiva. All rights reserved.** Copying or reusing any part of this project without written permission is not allowed. See [LICENSE](LICENSE).
 
 ## Why I made Story Teacher
 
@@ -298,4 +299,4 @@ deploy.sh              one-command Cloud Run deploy
 
 **P Om Shiva** · M.Tech CSE (2nd year), Pondicherry University · [github.com/omshiva24](https://github.com/omshiva24)
 
-Story Teacher was designed and built by P Om Shiva. © 2026 P Om Shiva. Released under the [MIT License](LICENSE): if you reuse this code, keep the copyright notice and credit the author.
+Story Teacher was designed and built by P Om Shiva. **© 2026 P Om Shiva. All rights reserved.** No part of this project (code, design, text, screenshots or video) may be copied, reused, modified or redistributed without the author's written permission. See [LICENSE](LICENSE).

@@ -1,3 +1,4 @@
+/*! Story Teacher · © 2026 P Om Shiva (M.Tech CSE, Pondicherry University). All rights reserved. Copying or reuse without written permission is not allowed. */
 /**
  * Quiz scoring and the parent/teacher report summary.
  * Shared by the browser (window.Scoring) and the tests (require).

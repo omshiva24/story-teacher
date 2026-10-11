@@ -1,3 +1,4 @@
+/*! Story Teacher · © 2026 P Om Shiva (M.Tech CSE, Pondicherry University). All rights reserved. Copying or reuse without written permission is not allowed. */
 /**
  * Age bands and age-to-school-stage mapping (play school to Class 12, ages 3–18).
  * Defined once and shared by the server (require) and the browser (window.AgeBands).
