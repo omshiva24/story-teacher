@@ -63,6 +63,34 @@ function pickVideoSources(derivatives) {
     .map(({ src, type }) => ({ src, type }));
 }
 
+const COMMON_WORDS = new Set(['with', 'from', 'that', 'this', 'what', 'does', 'work', 'works', 'into', 'about', 'their', 'there', 'when', 'where', 'which', 'your']);
+
+/**
+ * Keywords of a topic for matching file names: "Solar System" → ["solar", "system"].
+ * Long words keep their first six letters so "photosynthesis" also matches
+ * "photosynthetic". Short words lose a final "s" ("volcanoes" → "volcanoe").
+ * @param {string[]} titles
+ * @returns {string[]}
+ */
+function topicKeywords(titles) {
+  const words = titles
+    .join(' ')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 4 && !COMMON_WORDS.has(w));
+  return [...new Set(words.map((w) => (w.length > 7 ? w.slice(0, 6) : w.replace(/e?s$/, ''))))];
+}
+
+/**
+ * True when a file's name is about the topic. Articles sometimes carry
+ * unrelated files (a navigation box, a recent edit), so only files whose
+ * names share a keyword with the topic are shown to children.
+ */
+function isRelevant(item, keywords) {
+  const name = item.title.toLowerCase();
+  return keywords.some((k) => name.includes(k));
+}
+
 /**
  * Turns one file from the API into a media item, or null if unsuitable.
  * @param {object} page - A page from generator=images with videoinfo.
@@ -154,7 +182,18 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
         data = pageTitle ? await articleMedia(pageTitle) : null;
       }
       const pages = (data && data.query && Array.isArray(data.query.pages) && data.query.pages) || [];
-      const items = pages.map(toMediaItem).filter(Boolean);
+      const keywords = topicKeywords([title, pageTitle]);
+      const seen = new Set();
+      const items = pages
+        .map(toMediaItem)
+        .filter(Boolean)
+        .filter((item) => isRelevant(item, keywords))
+        .filter((item) => {
+          const key = item.src || (item.sources[0] && item.sources[0].src);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
       const result = {
         title: pageTitle,
         moving: items.filter((i) => i.kind !== 'image').slice(0, 4),
@@ -169,4 +208,4 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
   };
 }
 
-module.exports = { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle };
+module.exports = { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle, topicKeywords, isRelevant };
