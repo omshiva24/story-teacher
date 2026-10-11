@@ -98,6 +98,7 @@ h3 { font-size: 1.2rem; font-weight: 700; }
 .brand-name { font-family: var(--display); font-weight: 800; font-size: 1.35rem; letter-spacing: -0.01em; }
 .header-tools { display: flex; gap: 0.6rem; align-items: center; }
 .narrator-pick { display: flex; padding: 3px; border-radius: 999px; background: var(--grape-soft); }
+.narrator-label { align-self: center; padding: 0 0.5rem 0 0.7rem; font-weight: 700; color: var(--grape-deep); font-size: 0.95rem; }
 .narrator-btn {
   min-height: 40px; padding: 0.2rem 0.8rem; border-radius: 999px; border: 0; cursor: pointer;
   background: transparent; color: var(--grape-deep); font: inherit; font-weight: 700; white-space: nowrap;
@@ -681,6 +682,7 @@ legend { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.9rem; padding: 0;
   .header-tools { gap: 0.35rem; }
   .text-size { display: none; }
   .narrator-btn { padding: 0.2rem 0.6rem; }
+  .narrator-label { display: none; }
   .journey li span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   .journey li { min-width: 0; justify-content: center; }
   .theatre { padding: 0.5rem; }

@@ -8,10 +8,10 @@
     <title>Story Teacher · Learn anything through a story</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E" />
     <link rel="preload" href="/fonts/baloo2-latin.woff" as="font" type="font/woff" crossorigin />
-    <link rel="stylesheet" href="/styles.css?v=20261011a" />
-    <script src="/shared/ageBands.js?v=20261011a" defer></script>
-    <script src="/shared/scoring.js?v=20261011a" defer></script>
-    <script src="/app.js?v=20261011a" defer></script>
+    <link rel="stylesheet" href="/styles.css?v=20261011b" />
+    <script src="/shared/ageBands.js?v=20261011b" defer></script>
+    <script src="/shared/scoring.js?v=20261011b" defer></script>
+    <script src="/app.js?v=20261011b" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -23,9 +23,10 @@
           <span class="brand-name">Story Teacher</span>
         </a>
         <div class="header-tools">
-          <div class="narrator-pick" role="group" aria-label="Choose the narrator's voice">
-            <button type="button" class="narrator-btn" data-voice="female" aria-pressed="true"><span aria-hidden="true">👩🏽</span> Asha</button>
-            <button type="button" class="narrator-btn" data-voice="male" aria-pressed="false"><span aria-hidden="true">👨🏽</span> Arjun</button>
+          <div class="narrator-pick" role="group" aria-label="Choose the reading voice">
+            <span class="narrator-label" aria-hidden="true">Voice</span>
+            <button type="button" class="narrator-btn" data-voice="female" aria-pressed="true" aria-label="Female voice"><span aria-hidden="true">👩🏽</span> She</button>
+            <button type="button" class="narrator-btn" data-voice="male" aria-pressed="false" aria-label="Male voice"><span aria-hidden="true">👨🏽</span> He</button>
           </div>
           <p class="star-pill" id="star-pill" aria-live="polite"><span aria-hidden="true">⭐</span> <span id="star-count">0</span> <span class="sr-only">stars earned</span></p>
           <div class="text-size" role="group" aria-label="Text size">
@@ -99,7 +100,7 @@
         </div>
 
         <ol class="how-it-works" aria-label="What every lesson has">
-          <li><span aria-hidden="true">📚</span><strong>Story</strong> told by Asha or Arjun</li>
+          <li><span aria-hidden="true">📚</span><strong>Story</strong> read aloud in a female or male voice</li>
           <li><span aria-hidden="true">🎬</span><strong>Story video</strong> with captions</li>
           <li><span aria-hidden="true">🖼️</span><strong>Picture</strong> and real animations</li>
           <li><span aria-hidden="true">🧩</span><strong>Game and quiz</strong> to check understanding</li>
@@ -146,7 +147,7 @@
 
           <button type="button" id="watch-btn" class="watch-cta">
             <span class="watch-play" aria-hidden="true"></span>
-            <span class="watch-text"><strong>Watch the story video</strong><span id="watch-sub">Narrated by Asha, with captions</span></span>
+            <span class="watch-text"><strong>Watch the story video</strong><span id="watch-sub">Read aloud in a female voice, with captions</span></span>
           </button>
 
           <div class="spread">
