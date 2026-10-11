@@ -25,6 +25,9 @@ const SKIP_FILE =
 // Real surgery, injuries and similar are too graphic for children, even on science pages.
 const GRAPHIC_FILE = /dissect|disecc|surger|surgical|transplant|autopsy|cadaver|corpse|wound|injur|blood_?loss|necro|gore|dead|death|operation|slaughter/i;
 
+// Commons search is wider than the article, so only clearly educational videos are taken from it.
+const EDUCATIONAL_VIDEO = /animat|simulat|diagram|model|explain|how |what |why |introduc|lesson|nasa|cycle|process|lifecycle|life cycle|timelapse|time-lapse/i;
+
 // Diagrams labelled in another language ("Photosynthesis-ar.gif"); English or unlabelled ones are kept.
 const OTHER_LANGUAGE = /[-_ (]([a-z]{2,3})\)?$/;
 
@@ -222,7 +225,7 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
       const pages = (data && data.query && Array.isArray(data.query.pages) && data.query.pages) || [];
       const keywords = topicKeywords([title, pageTitle]);
       const seen = new Set();
-      let allPages = pages;
+      let candidates;
       // Few moving pictures in the article? Look for animations and videos on Commons too.
       const movingInArticle = pages.map(toMediaItem).filter((i) => i && i.kind !== 'image' && isRelevant(i, keywords)).length;
       if (movingInArticle < 2) {
@@ -231,10 +234,14 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
           commonsMoving(subject, 'filemime:image/gif').catch(() => []),
           commonsMoving(subject, 'filetype:video').catch(() => []),
         ]);
-        allPages = [...pages, ...gifs.slice(0, 6), ...videos.slice(0, 4)];
+        const fromCommons = [...gifs.slice(0, 6), ...videos.slice(0, 4)]
+          .map(toMediaItem)
+          .filter((i) => i && (i.kind === 'gif' || (i.kind === 'video' && EDUCATIONAL_VIDEO.test(i.title))));
+        candidates = [...pages.map(toMediaItem), ...fromCommons];
+      } else {
+        candidates = pages.map(toMediaItem);
       }
-      const items = allPages
-        .map(toMediaItem)
+      const items = candidates
         .filter(Boolean)
         .filter((item) => isRelevant(item, keywords))
         .filter((item) => {
