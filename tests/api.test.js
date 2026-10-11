@@ -161,3 +161,56 @@ describe('other routes and security headers', () => {
     delete process.env.GEMINI_API_KEY;
   });
 });
+
+describe('GET /api/media and POST /api/voice', () => {
+  const MEDIA = { title: 'Water cycle', moving: [{ kind: 'gif', src: 'https://upload.wikimedia.org/a.gif', title: 'Rain' }], pictures: [] };
+
+  function buildMediaApp({ findMedia = jest.fn().mockResolvedValue(MEDIA), tts } = {}) {
+    const cache = new MemoryCache({ maxEntries: 10, ttlMs: 60000 });
+    const storyService = createStoryService({ aiClient: { generateStoryJson: jest.fn() }, cache });
+    return { app: createApp({ storyService, config: baseConfig, findMedia, tts }), findMedia };
+  }
+
+  test('returns moving pictures for a topic', async () => {
+    const { app, findMedia } = buildMediaApp();
+    const res = await request(app).get('/api/media').query({ title: 'Water cycle' });
+    expect(res.status).toBe(200);
+    expect(res.body.moving[0].kind).toBe('gif');
+    expect(findMedia).toHaveBeenCalledWith('Water cycle');
+  });
+
+  test('rejects missing, invalid and unsafe titles', async () => {
+    const { app, findMedia } = buildMediaApp();
+    expect((await request(app).get('/api/media')).status).toBe(400);
+    expect((await request(app).get('/api/media').query({ title: '<script>' })).status).toBe(400);
+    expect((await request(app).get('/api/media').query({ title: 'guns' })).status).toBe(400);
+    expect(findMedia).not.toHaveBeenCalled();
+  });
+
+  test('returns WAV narration in the chosen voice', async () => {
+    const synthesize = jest.fn().mockResolvedValue(Buffer.from('RIFFxxxxWAVE'));
+    const { app } = buildMediaApp({ tts: { synthesize } });
+    const res = await request(app).post('/api/voice').send({ text: 'You are now inside a leaf!', voice: 'male' });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/audio\/wav/);
+    expect(synthesize).toHaveBeenCalledWith('You are now inside a leaf!', 'male');
+  });
+
+  test('voice rejects empty, too long and unsafe text, and reports when it is not set up', async () => {
+    const synthesize = jest.fn();
+    const { app } = buildMediaApp({ tts: { synthesize } });
+    expect((await request(app).post('/api/voice').send({ text: '' })).status).toBe(400);
+    expect((await request(app).post('/api/voice').send({ text: 'a'.repeat(901) })).status).toBe(400);
+    expect((await request(app).post('/api/voice').send({ text: 'buy guns here' })).status).toBe(400);
+    expect(synthesize).not.toHaveBeenCalled();
+    const { app: noVoice } = buildMediaApp();
+    expect((await request(noVoice).post('/api/voice').send({ text: 'Hello' })).status).toBe(503);
+  });
+
+  test('the page allows Wikimedia video and narration audio, nothing else', async () => {
+    const { app } = buildMediaApp();
+    const res = await request(app).get('/');
+    expect(res.headers['content-security-policy']).toMatch(/media-src 'self' blob: https:\/\/upload\.wikimedia\.org https:\/\/thumb\.wikimedia\.org/);
+    expect(res.headers['content-security-policy']).toMatch(/font-src 'self'/);
+  });
+});

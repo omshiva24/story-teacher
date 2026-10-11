@@ -13,6 +13,8 @@ const { MemoryCache } = require('./services/cache');
 const { createStoryService } = require('./services/storyService');
 const { createWikiImageFinder } = require('./services/wikiImageService');
 const { createWikiArticleFinder } = require('./services/wikiLessonService');
+const { createWikiMediaFinder } = require('./services/wikiMediaService');
+const { createTtsService } = require('./services/ttsService');
 
 /**
  * @returns {import('express').Express}
@@ -34,7 +36,14 @@ function buildApp() {
     findTopicImage: createWikiImageFinder(),
     findArticle: createWikiArticleFinder(),
   });
-  return createApp({ storyService, config, checkAiStatus: aiClient.checkStatus });
+  const tts = createTtsService({ apiKey: config.geminiApiKey, model: config.ttsModel });
+  const findMedia = createWikiMediaFinder({ cache: new MemoryCache({ maxEntries: 200, ttlMs: 6 * 60 * 60 * 1000 }) });
+  // The status page also reports whether the natural voice works.
+  const checkAiStatus = async () => {
+    const voice = await tts.checkStatus();
+    return { voice, ...(await aiClient.checkStatus()) };
+  };
+  return createApp({ storyService, config, checkAiStatus, findMedia, tts });
 }
 
 module.exports = { buildApp, config };

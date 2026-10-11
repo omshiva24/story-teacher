@@ -3,14 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Story Teacher turns any topic into a story for ages 3 to 18, with a picture, a matching game, a quiz and a report for parents and teachers." />
-    <meta name="theme-color" content="#4c2fc4" />
+    <meta name="description" content="Story Teacher turns any topic into a story for ages 3 to 18, read aloud by a friendly narrator, with a story video, real animations, a matching game, a quiz and a report for parents and teachers." />
+    <meta name="theme-color" content="#5b2ee5" />
     <title>Story Teacher · Learn anything through a story</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%96%3C/text%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="/styles.css?v=20261009c" />
-    <script src="/shared/ageBands.js?v=20261009c" defer></script>
-    <script src="/shared/scoring.js?v=20261009c" defer></script>
-    <script src="/app.js?v=20261009c" defer></script>
+    <link rel="preload" href="/fonts/baloo2-latin.woff" as="font" type="font/woff" crossorigin />
+    <link rel="stylesheet" href="/styles.css?v=20261011a" />
+    <script src="/shared/ageBands.js?v=20261011a" defer></script>
+    <script src="/shared/scoring.js?v=20261011a" defer></script>
+    <script src="/app.js?v=20261011a" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -22,6 +23,10 @@
           <span class="brand-name">Story Teacher</span>
         </a>
         <div class="header-tools">
+          <div class="narrator-pick" role="group" aria-label="Choose the narrator's voice">
+            <button type="button" class="narrator-btn" data-voice="female" aria-pressed="true"><span aria-hidden="true">👩🏽</span> Asha</button>
+            <button type="button" class="narrator-btn" data-voice="male" aria-pressed="false"><span aria-hidden="true">👨🏽</span> Arjun</button>
+          </div>
           <p class="star-pill" id="star-pill" aria-live="polite"><span aria-hidden="true">⭐</span> <span id="star-count">0</span> <span class="sr-only">stars earned</span></p>
           <div class="text-size" role="group" aria-label="Text size">
             <button type="button" class="size-btn" data-size="md" aria-pressed="true" aria-label="Normal text">A</button>
@@ -36,19 +41,25 @@
       <!-- HOME: search any topic -->
       <section id="home" aria-labelledby="home-heading">
         <div class="hero">
-          <div class="hero-deco" aria-hidden="true">
-            <span>🚀</span><span>🦕</span><span>🔬</span><span>🌍</span><span>➗</span><span>🎨</span>
+          <div class="sky" aria-hidden="true">
+            <span class="sun"></span>
+            <span class="cloud cloud-a"></span>
+            <span class="cloud cloud-b"></span>
+            <svg class="hills" viewBox="0 0 1200 220" preserveAspectRatio="none" focusable="false">
+              <path class="hill-back" d="M0 120 C 180 40 360 60 520 110 S 860 170 1020 90 S 1160 60 1200 80 V220 H0 Z" />
+              <path class="hill-front" d="M0 170 C 220 110 420 130 600 165 S 960 200 1200 140 V220 H0 Z" />
+            </svg>
           </div>
           <div class="hero-inner">
-            <h1 id="home-heading">What do you want to learn today?</h1>
-            <p class="hero-sub">Search any topic, from space and animals to maths, history or how phones work. We turn it into a story, a picture, a game and a quiz.</p>
+            <h1 id="home-heading">What should we learn today?</h1>
+            <p class="hero-sub">Type any topic. A friendly narrator tells it as a story made for the child's age, with a story video, real animations, a game and a quiz.</p>
 
             <form id="story-form" class="search-card" novalidate>
               <div class="field">
                 <label for="topic">Topic</label>
                 <div class="search-box">
                   <span class="search-icon" aria-hidden="true">🔍</span>
-                  <input id="topic" name="topic" type="search" required minlength="2" maxlength="100" autocomplete="off" placeholder="Try “black holes” or “fractions”" aria-describedby="topic-error" enterkeyhint="go" />
+                  <input id="topic" name="topic" type="search" required minlength="2" maxlength="100" autocomplete="off" placeholder="Try “volcanoes” or “fractions”" aria-describedby="topic-error" enterkeyhint="go" />
                   <button type="button" id="surprise-btn" class="btn btn-ghost surprise-btn"><span aria-hidden="true">🎲</span> Surprise me</button>
                 </div>
                 <p id="topic-error" class="field-error" hidden></p>
@@ -69,12 +80,12 @@
 
                 <div class="field name-field">
                   <label for="name">Child's name <span class="optional">(optional)</span></label>
-                  <input id="name" name="name" type="text" maxlength="30" autocomplete="given-name" placeholder="Becomes the hero" aria-describedby="name-error" />
+                  <input id="name" name="name" type="text" maxlength="30" autocomplete="given-name" placeholder="They become the hero" aria-describedby="name-error" />
                   <p id="name-error" class="field-error" hidden></p>
                 </div>
               </div>
 
-              <button type="submit" id="create-btn" class="btn btn-primary btn-big">Start learning <span aria-hidden="true">→</span></button>
+              <button type="submit" id="create-btn" class="btn btn-primary btn-big">Make my story</button>
               <div id="status" class="status" role="status" aria-live="polite"></div>
               <div id="error" class="error-box" role="alert" hidden></div>
             </form>
@@ -82,18 +93,18 @@
         </div>
 
         <div class="explore">
-          <h2 id="explore-heading">Explore ideas</h2>
-          <p class="explore-sub">Pick a world and we'll choose a topic for you.</p>
+          <h2 id="explore-heading">Not sure what to pick?</h2>
+          <p class="explore-sub">Choose a world and we'll find a topic in it.</p>
           <ul class="category-grid" id="category-grid" aria-labelledby="explore-heading"></ul>
         </div>
 
-        <ul class="how-it-works" aria-label="How it works">
-          <li><span aria-hidden="true">📚</span><strong>Story</strong> made for their age</li>
-          <li><span aria-hidden="true">🖼️</span><strong>Picture</strong> of how it works</li>
-          <li><span aria-hidden="true">🧩</span><strong>Game</strong> to match ideas</li>
-          <li><span aria-hidden="true">✅</span><strong>Quiz</strong> to check understanding</li>
+        <ol class="how-it-works" aria-label="What every lesson has">
+          <li><span aria-hidden="true">📚</span><strong>Story</strong> told by Asha or Arjun</li>
+          <li><span aria-hidden="true">🎬</span><strong>Story video</strong> with captions</li>
+          <li><span aria-hidden="true">🖼️</span><strong>Picture</strong> and real animations</li>
+          <li><span aria-hidden="true">🧩</span><strong>Game and quiz</strong> to check understanding</li>
           <li><span aria-hidden="true">📋</span><strong>Report</strong> for parents and teachers</li>
-        </ul>
+        </ol>
       </section>
 
 
@@ -111,7 +122,7 @@
         </nav>
 
         <!-- 1. Story -->
-        <section id="story-panel" class="card panel" aria-labelledby="story-title" hidden>
+        <section id="story-panel" class="panel book" aria-labelledby="story-title" hidden>
           <div class="story-head">
             <div class="story-head-text">
               <div class="pill-row">
@@ -121,7 +132,7 @@
               <h2 id="story-title" class="story-title" tabindex="-1"></h2>
               <p id="fallback-note" class="fallback-note" hidden></p>
               <p id="parent-hint" class="parent-hint" hidden>
-                <span aria-hidden="true">👪</span> Grown-ups: read this part aloud together, or press “Read aloud”.
+                <span aria-hidden="true">👪</span> Grown-ups: watch the story video together, or press “Listen”.
               </p>
             </div>
             <figure id="topic-photo" class="topic-photo" hidden>
@@ -133,23 +144,27 @@
             </figure>
           </div>
 
-          <div class="part-progress" aria-hidden="true">
-            <span class="pdot"></span><span class="pdot"></span><span class="pdot"></span>
-          </div>
+          <button type="button" id="watch-btn" class="watch-cta">
+            <span class="watch-play" aria-hidden="true"></span>
+            <span class="watch-text"><strong>Watch the story video</strong><span id="watch-sub">Narrated by Asha, with captions</span></span>
+          </button>
 
-          <div class="story-layout">
-            <figure class="board" id="part-board" aria-labelledby="board-caption">
+          <div class="spread">
+            <figure class="page page-left board" id="part-board" aria-labelledby="board-caption">
               <div id="board-items" class="board-stage"></div>
               <figcaption id="board-caption" class="board-caption"></figcaption>
             </figure>
-            <div class="story-copy">
+            <div class="page page-right story-copy">
+              <div class="part-progress" aria-hidden="true">
+                <span class="pdot"></span><span class="pdot"></span><span class="pdot"></span>
+              </div>
               <h3 id="part-heading" class="part-heading" tabindex="-1"></h3>
               <p id="story-text" class="story-text"></p>
             </div>
           </div>
           <div class="actions">
             <button type="button" id="read-story-btn" class="btn btn-secondary speech-btn" aria-pressed="false">
-              <span aria-hidden="true">🔊</span> <span class="btn-label">Read aloud</span>
+              <span aria-hidden="true">🔊</span> <span class="btn-label">Listen</span>
             </button>
             <button type="button" id="next-part-btn" class="btn btn-primary">What happens next?</button>
           </div>
@@ -167,6 +182,12 @@
               <p id="fun-fact"></p>
             </div>
           </aside>
+          <section id="media-box" class="media-box" aria-labelledby="media-heading" hidden>
+            <h3 id="media-heading">See it for real</h3>
+            <p class="media-sub">Animations, videos and pictures from the Wikipedia article, free to use and credited.</p>
+            <div id="media-moving" class="media-moving"></div>
+            <ul id="media-pictures" class="media-pictures" aria-label="More pictures"></ul>
+          </section>
           <div class="actions">
             <button type="button" id="to-game-btn" class="btn btn-primary">Play the game <span aria-hidden="true">🧩</span></button>
           </div>
@@ -262,10 +283,37 @@
       </div>
     </main>
 
+    <!-- Story video: a narrated, captioned scene player built from the lesson -->
+    <div id="theatre" class="theatre" role="dialog" aria-modal="true" aria-labelledby="th-title" hidden>
+      <div class="th-frame">
+        <div class="th-top">
+          <h2 id="th-title" class="th-title"></h2>
+          <button type="button" id="th-close" class="th-icon-btn" aria-label="Close the story video">✕</button>
+        </div>
+        <div class="th-progress" id="th-progress" aria-hidden="true"></div>
+        <div class="th-stage" id="th-stage">
+          <div class="th-bg" id="th-bg" aria-hidden="true"></div>
+          <div class="th-scene" id="th-scene"></div>
+          <div class="th-narrator" id="th-narrator" aria-hidden="true">
+            <span class="th-face" id="th-face">👩🏽</span>
+            <span class="th-wave"><i></i><i></i><i></i></span>
+          </div>
+          <p class="th-caption" id="th-caption" aria-live="polite"></p>
+        </div>
+        <div class="th-controls">
+          <button type="button" id="th-prev" class="th-icon-btn" aria-label="Previous scene">⏮</button>
+          <button type="button" id="th-play" class="th-play-btn" aria-label="Pause">❚❚</button>
+          <button type="button" id="th-next" class="th-icon-btn" aria-label="Next scene">⏭</button>
+          <button type="button" id="th-cc" class="th-chip" aria-pressed="true">Captions</button>
+          <p class="th-count" id="th-count" aria-live="off"></p>
+        </div>
+      </div>
+    </div>
+
     <div id="confetti" class="confetti" aria-hidden="true"></div>
 
     <footer class="site-footer">
-      <p>Stories are written by AI and fact-checked with Google Search when available. Grown-ups, please check the facts. No child data is stored.</p>
+      <p>Stories are written by AI and fact-checked with Google Search when available. Animations and pictures come from Wikipedia and Wikimedia Commons, credited under their free licences. Grown-ups, please check the facts. No child data is stored.</p>
     </footer>
   </body>
 </html>

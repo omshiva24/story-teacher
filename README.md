@@ -131,7 +131,10 @@ If the AI is busy, a lesson is built from Simple English Wikipedia (younger chil
 |---|---|---|
 | 🔍 | **Search any topic** | Free-text search, 8 "Explore ideas" worlds (Space, Animals, Human body, Maths, Earth & weather, How things work, History & people, Plants & nature), and a 🎲 Surprise me button |
 | 🌐 | **Fact-checked with Google Search** | Gemini 3 uses Google Search grounding while writing; sources are listed in the report. It falls back to a normal call automatically if search is not available |
-| 📚 | **Story for their age** | 3 parts with cliffhangers, the child as the hero, and read-aloud |
+| 📚 | **Story for their age** | 3 parts with cliffhangers and the child as the hero, laid out like an open storybook |
+| 🗣️ | **A real-sounding narrator** | Choose **Asha** (female) or **Arjun** (male). Narration uses Gemini text-to-speech with a warm storyteller style; if that is not available, the best natural voice on the device is used. The word being read lights up |
+| 🎞️ | **Story video for any topic** | "Watch the story video" plays the lesson as narrated scenes: title, each story part with pictures that appear as the narrator speaks, a real animation, the fun fact and an ending. Captions, play/pause, scene skipping, keyboard controls and Escape to close |
+| 🎥 | **Real GIFs and videos** | "See it for real" shows the animations, short videos and diagrams that Wikipedia editors chose for that article, with the artist, licence and a source link. Only Wikimedia hosts are allowed. With reduced motion turned on, GIFs wait for a click |
 | 🎬 | **Live picture for every part** | While each part is read, an animated diagram shows what that part explains: a flow with arrows, a group of things, or A vs B |
 | 📷 | **Real photo of the topic** | A free Wikipedia photo, credited and linked; only images from upload.wikimedia.org are allowed |
 | 🖼️ | **Picture of the topic** | Drawn automatically as a **cycle** diagram (SVG), a numbered **steps** flow, or a **parts** grid, plus a "Did you know?" fact |
@@ -179,6 +182,7 @@ npm start                 # http://localhost:8080
 | `GEMINI_API_KEY` | (required) | Your key; server only |
 | `GEMINI_MODEL` | `gemini-3.8-flash` | Use `gemini-3.5-flash-lite` for faster, cheaper stories |
 | `GEMINI_GROUNDING` | `true` | Fact-check with Google Search; `false` turns it off |
+| `GEMINI_TTS_MODEL` | (found automatically) | Text-to-speech model for the natural narrator voice |
 | `AI_TIMEOUT_MS` | `30000` | Time limit for each AI call |
 | `RATE_LIMIT_MAX` | `10` | Story requests per minute per visitor |
 

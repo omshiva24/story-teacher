@@ -21,6 +21,8 @@ const config = Object.freeze({
   nodeEnv: process.env.NODE_ENV || 'development',
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+  // Natural narration voice. Empty = find a text-to-speech model automatically.
+  ttsModel: process.env.GEMINI_TTS_MODEL || '',
   // Fact-check with Google Search (Gemini 3 models). Set GEMINI_GROUNDING=false to turn off.
   groundingEnabled: process.env.GEMINI_GROUNDING !== 'false',
   aiTimeoutMs: readInt('AI_TIMEOUT_MS', 30000),
