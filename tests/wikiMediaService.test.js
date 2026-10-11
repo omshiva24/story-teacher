@@ -109,12 +109,14 @@ describe('createWikiMediaFinder', () => {
   });
 
   test('keeps only files about the topic, once each', async () => {
-    const unrelated = { ...photo, title: 'File:Famous person 2025.png' };
+    const unrelated = { ...photo, title: 'File:Famous person 2025.png', videoinfo: [{ ...photo.videoinfo[0], extmetadata: { Categories: { value: 'Actresses from India|2025 portrait photographs' } } }] };
+    const editorsChoice = { ...photo, title: 'File:Ice melting in a glass.jpg', videoinfo: [{ ...photo.videoinfo[0], thumburl: 'https://upload.wikimedia.org/ice.jpg' }] };
     const copy = { ...gif, title: 'File:Water cycle animation (copy).gif' };
-    const fetchImpl = async () => ({ ok: true, json: async () => ({ query: { pages: [gif, copy, unrelated, photo] } }) });
+    const fetchImpl = async () => ({ ok: true, json: async () => ({ query: { pages: [gif, copy, unrelated, photo, editorsChoice] } }) });
     const result = await createWikiMediaFinder({ fetchImpl })('Water cycle');
     expect(result.moving).toHaveLength(1);
-    expect(result.pictures.map((p) => p.title)).toEqual(['Water vapour clouds']);
+    // The article's own pictures are kept even when the name differs; the unrelated person is not.
+    expect(result.pictures.map((p) => p.title)).toEqual(['Water vapour clouds', 'Ice melting in a glass']);
   });
 
   test('adds animations from Wikimedia Commons when the article has few', async () => {
@@ -132,6 +134,21 @@ describe('createWikiMediaFinder', () => {
     const result = await createWikiMediaFinder({ fetchImpl })('Photosynthesis');
     expect(result.moving.map((m) => m.title)).toEqual(['Photosynthesis (animated)']);
     expect(result.pictures).toHaveLength(1);
+  });
+
+  test('Commons results must match every keyword of the topic', async () => {
+    const darkMatter = { ...gif, title: 'File:Dark matter halo animation.gif', videoinfo: [{ ...gif.videoinfo[0], url: 'https://upload.wikimedia.org/dm.gif' }] };
+    const states = { ...gif, title: 'File:States of matter animation.gif', videoinfo: [{ ...gif.videoinfo[0], url: 'https://upload.wikimedia.org/sm.gif' }] };
+    const fetchImpl = async (url) => {
+      if (url.startsWith('https://commons.wikimedia.org/') && url.includes('filemime')) return { ok: true, json: async () => ({ query: { pages: [darkMatter, states] } }) };
+      return { ok: true, json: async () => ({ query: { pages: [] } }) };
+    };
+    const result = await createWikiMediaFinder({ fetchImpl })('States of matter');
+    expect(result.moving.map((m) => m.title)).toEqual(['States of matter animation']);
+  });
+
+  test('skips clip-art icons', () => {
+    expect(toMediaItem({ ...gif, title: 'File:Noun ballerina 8247195.gif' })).toBe(null);
   });
 
   test('never throws: failures give an empty result', async () => {

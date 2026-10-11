@@ -28,6 +28,12 @@ const GRAPHIC_FILE = /dissect|disecc|surger|surgical|transplant|autopsy|cadaver|
 // Commons search is wider than the article, so only clearly educational videos are taken from it.
 const EDUCATIONAL_VIDEO = /animat|simulat|diagram|model|explain|how |what |why |introduc|lesson|nasa|cycle|process|lifecycle|life cycle|timelapse|time-lapse/i;
 
+// Photos of people (actors, singers, politicians…) that are not the topic itself, found by their Commons categories.
+const PEOPLE_CATEGORY = /\b(people|portraits?|actress(es)?|actors?|singers?|musicians?|births|deaths|politicians|celebrit(y|ies)|selfies?|footballers|cricketers)\b/i;
+
+// Icon sets ("Noun ballerina 8247195") and similar clip art.
+const CLIP_ART = /\b\d{6,}\b|noun[_ ]project|clipart|clip[_ ]art|emoji|sticker/i;
+
 // Diagrams labelled in another language ("Photosynthesis-ar.gif"); English or unlabelled ones are kept.
 const OTHER_LANGUAGE = /[-_ (]([a-z]{2,3})\)?$/;
 
@@ -96,9 +102,9 @@ function topicKeywords(titles) {
  * unrelated files (a navigation box, a recent edit), so only files whose
  * names share a keyword with the topic are shown to children.
  */
-function isRelevant(item, keywords) {
-  const name = item.title.toLowerCase();
-  return keywords.some((k) => name.includes(k));
+function isRelevant(item, keywords, { all = false } = {}) {
+  const name = item.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  return all ? keywords.every((k) => name.includes(k)) : keywords.some((k) => name.includes(k));
 }
 
 /**
@@ -108,14 +114,16 @@ function isRelevant(item, keywords) {
  */
 function toMediaItem(page) {
   const info = page && Array.isArray(page.videoinfo) ? page.videoinfo[0] : null;
-  if (!info || SKIP_FILE.test(page.title || '') || GRAPHIC_FILE.test(page.title || '')) return null;
+  if (!info || SKIP_FILE.test(page.title || '') || GRAPHIC_FILE.test(page.title || '') || CLIP_ART.test(page.title || '')) return null;
   const title = captionFromTitle(page.title);
   if (!title || !checkTopicSafety(title).safe) return null;
   const language = OTHER_LANGUAGE.exec(String(page.title).replace(/\.[a-z0-9]+$/i, ''));
   if (language && language[1] !== 'en') return null;
 
   const meta = info.extmetadata || {};
+  const categories = String((meta.Categories && meta.Categories.value) || '');
   const base = {
+    people: PEOPLE_CATEGORY.test(categories),
     title,
     width: Number(info.thumbwidth || info.width) || 0,
     height: Number(info.thumbheight || info.height) || 0,
@@ -177,7 +185,7 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
       prop: 'videoinfo',
       viprop: 'url|mime|size|derivatives|extmetadata',
       viurlwidth: '640',
-      viextmetadatafilter: 'Artist|LicenseShortName',
+      viextmetadatafilter: 'Artist|LicenseShortName|Categories',
     });
   }
 
@@ -193,7 +201,7 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
         prop: 'videoinfo',
         viprop: 'url|mime|size|derivatives|extmetadata',
         viurlwidth: '640',
-        viextmetadatafilter: 'Artist|LicenseShortName',
+        viextmetadatafilter: 'Artist|LicenseShortName|Categories',
       },
       COMMONS_API,
     );
@@ -227,7 +235,11 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
       const seen = new Set();
       let candidates;
       // Few moving pictures in the article? Look for animations and videos on Commons too.
-      const movingInArticle = pages.map(toMediaItem).filter((i) => i && i.kind !== 'image' && isRelevant(i, keywords)).length;
+      // The article's own media was chosen by its editors, so it is trusted unless it
+      // is a photo of a person who is not the topic. Wider Commons results must
+      // match every keyword of the topic ("states of matter" ≠ "dark matter").
+      const fromArticle = pages.map(toMediaItem).filter((i) => i && (!i.people || isRelevant(i, keywords)));
+      const movingInArticle = fromArticle.filter((i) => i.kind !== 'image').length;
       if (movingInArticle < 2) {
         const subject = pageTitle || title;
         const [gifs, videos] = await Promise.all([
@@ -236,14 +248,14 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
         ]);
         const fromCommons = [...gifs.slice(0, 6), ...videos.slice(0, 4)]
           .map(toMediaItem)
-          .filter((i) => i && (i.kind === 'gif' || (i.kind === 'video' && EDUCATIONAL_VIDEO.test(i.title))));
-        candidates = [...pages.map(toMediaItem), ...fromCommons];
+          .filter((i) => i && !i.people && isRelevant(i, keywords, { all: true }))
+          .filter((i) => i.kind === 'gif' || (i.kind === 'video' && EDUCATIONAL_VIDEO.test(i.title)));
+        candidates = [...fromArticle, ...fromCommons];
       } else {
-        candidates = pages.map(toMediaItem);
+        candidates = fromArticle;
       }
       const items = candidates
-        .filter(Boolean)
-        .filter((item) => isRelevant(item, keywords))
+        .map(({ people: _people, ...item }) => item)
         .filter((item) => {
           const key = item.src || (item.sources[0] && item.sources[0].src);
           if (seen.has(key)) return false;
