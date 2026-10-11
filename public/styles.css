@@ -691,6 +691,12 @@ legend { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.9rem; padding: 0;
   .th-caption { left: 0.6rem; right: 0.6rem; bottom: 0.6rem; }
   .th-narrator { left: auto; right: 0.8rem; top: 0.8rem; bottom: auto; }
   .th-face { width: 48px; height: 48px; font-size: 1.7rem; }
+  .th-scene { gap: 0.6rem; }
+  .th-scene .s-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; width: 100%; max-width: 320px; }
+  .th-scene .s-arrow { display: none; }
+  .th-scene .s-tile { min-width: 0; padding: 0.6rem 0.4rem; border-radius: 18px; }
+  .th-scene .s-tile .e { font-size: 2.4rem; }
+  .th-scene .s-tile .l { font-size: 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
