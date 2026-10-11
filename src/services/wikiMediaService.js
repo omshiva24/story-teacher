@@ -23,7 +23,11 @@ const SKIP_FILE =
   /logo|icon|symbol|flag|protection|shackle|oojs|commons-|wiktionary|wikiquote|wikibooks|wikisource|wikiversity|wikinews|wikivoyage|wikidata|portal|question_book|ambox|padlock|stub|nuvola|crystal|disambig|pog|location|locator|map_of|_map|signature|edit-|audio|speaker|sound|increase|decrease|steady|loudspeaker/i;
 
 // Real surgery, injuries and similar are too graphic for children, even on science pages.
-const GRAPHIC_FILE = /dissect|disecc|surger|surgical|transplant|autopsy|cadaver|corpse|wound|injur|blood_?loss|necro|gore|dead|death|operation|slaughter/i;
+const GRAPHIC_FILE = /dissect|disecc|surger|surgical|transplant|autopsy|cadaver|corpse|wound|injur|blood_?loss|necro|gore|dead|death|operation|slaughter|attack|massacre|bombing|terror|shooting|execution|riot|genocide|hostage|assassinat|war[_ ]crime|casualt/i;
+
+// Teaching pictures first; charts of countries and statistics last.
+const TEACHING_WORDS = /diagram|cycle|scheme|schema|structure|parts|anatomy|process|model|simple|label|overview|animat|how|stages?|example|steps?|illustrat|explain/i;
+const CHART_WORDS = /share[_ ]of|per[_ ]capita|index|ranking|world|map|by[_ ]country|statistic|\b(19|20)\d\d\b/i;
 
 // Commons search is wider than the article, so only clearly educational videos are taken from it.
 const EDUCATIONAL_VIDEO = /animat|simulat|diagram|model|explain|how |what |why |introduc|lesson|nasa|cycle|process|lifecycle|life cycle|timelapse|time-lapse/i;
@@ -105,6 +109,12 @@ function topicKeywords(titles) {
 function isRelevant(item, keywords, { all = false } = {}) {
   const name = item.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
   return all ? keywords.every((k) => name.includes(k)) : keywords.some((k) => name.includes(k));
+}
+
+/** Higher is better for teaching: named after the topic, diagrams, not statistics. */
+function rankScore(item, keywords) {
+  const name = item.title;
+  return (isRelevant(item, keywords) ? 2 : 0) + (TEACHING_WORDS.test(name) ? 1 : 0) - (CHART_WORDS.test(name) ? 2 : 0);
 }
 
 /**
@@ -226,7 +236,9 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
     try {
       let data = await articleMedia(title);
       let pageTitle = title;
-      if (!data || !data.query || !Array.isArray(data.query.pages)) {
+      // A topic that is not an exact page name comes back as one "missing" page, not files.
+      const hasFiles = (d) => Boolean(d && d.query && Array.isArray(d.query.pages) && d.query.pages.some((p) => p.ns === 6));
+      if (!hasFiles(data)) {
         pageTitle = await searchTitle(title);
         data = pageTitle ? await articleMedia(pageTitle) : null;
       }
@@ -248,7 +260,7 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
         ]);
         const fromCommons = [...gifs.slice(0, 6), ...videos.slice(0, 4)]
           .map(toMediaItem)
-          .filter((i) => i && !i.people && isRelevant(i, keywords, { all: true }))
+          .filter((i) => i && !i.people && isRelevant(i, topicKeywords([subject]), { all: true }))
           .filter((i) => i.kind === 'gif' || (i.kind === 'video' && EDUCATIONAL_VIDEO.test(i.title)));
         candidates = [...fromArticle, ...fromCommons];
       } else {
@@ -262,10 +274,14 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
           seen.add(key);
           return true;
         });
+      const ranked = items
+        .map((item, order) => ({ item, order, score: rankScore(item, keywords) }))
+        .sort((a, b) => b.score - a.score || a.order - b.order)
+        .map((entry) => entry.item);
       const result = {
         title: pageTitle,
-        moving: items.filter((i) => i.kind !== 'image').slice(0, 4),
-        pictures: items.filter((i) => i.kind === 'image').slice(0, 6),
+        moving: ranked.filter((i) => i.kind !== 'image').slice(0, 4),
+        pictures: ranked.filter((i) => i.kind === 'image').slice(0, 6),
       };
       if (cache) cache.set(key, result);
       return result;
@@ -276,4 +292,4 @@ function createWikiMediaFinder({ timeoutMs = 6000, fetchImpl = globalThis.fetch,
   };
 }
 
-module.exports = { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle, topicKeywords, isRelevant };
+module.exports = { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle, topicKeywords, isRelevant, rankScore };

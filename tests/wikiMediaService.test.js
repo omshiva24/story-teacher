@@ -1,12 +1,14 @@
 'use strict';
 
-const { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle, topicKeywords, isRelevant } = require('../src/services/wikiMediaService');
+const { createWikiMediaFinder, toMediaItem, pickVideoSources, safeMediaUrl, captionFromTitle, topicKeywords, isRelevant, rankScore } = require('../src/services/wikiMediaService');
 
 const gif = {
+  ns: 6,
   title: 'File:Water cycle animation.gif',
   videoinfo: [{ mime: 'image/gif', duration: 2.4, size: 500000, width: 400, height: 300, url: 'https://upload.wikimedia.org/w/a.gif?utm_source=x', thumburl: 'https://upload.wikimedia.org/w/a-thumb.gif', descriptionurl: 'https://commons.wikimedia.org/wiki/File:A.gif', extmetadata: { Artist: { value: '<a href="https://x">Ana &amp; Co</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' } } }],
 };
 const video = {
+  ns: 6,
   title: "File:Earth's Water Cycle.ogv",
   videoinfo: [{
     mime: 'application/ogg', size: 70000000, width: 640, height: 360, duration: 352.9,
@@ -19,9 +21,9 @@ const video = {
     ],
   }],
 };
-const logo = { title: 'File:Commons-logo.svg', videoinfo: [{ mime: 'image/svg+xml', width: 1024, height: 1376, url: 'https://upload.wikimedia.org/x.svg' }] };
-const photo = { title: 'File:Water vapour clouds.jpg', videoinfo: [{ mime: 'image/jpeg', size: 200000, width: 1600, height: 1000, url: 'https://upload.wikimedia.org/r.jpg', thumburl: 'https://upload.wikimedia.org/r-640.jpg' }] };
-const foreign = { title: 'File:Bad.gif', videoinfo: [{ mime: 'image/gif', size: 1000, width: 400, height: 300, url: 'https://evil.example.com/a.gif' }] };
+const logo = { ns: 6, title: 'File:Commons-logo.svg', videoinfo: [{ mime: 'image/svg+xml', width: 1024, height: 1376, url: 'https://upload.wikimedia.org/x.svg' }] };
+const photo = { ns: 6, title: 'File:Water vapour clouds.jpg', videoinfo: [{ mime: 'image/jpeg', size: 200000, width: 1600, height: 1000, url: 'https://upload.wikimedia.org/r.jpg', thumburl: 'https://upload.wikimedia.org/r-640.jpg' }] };
+const foreign = { ns: 6, title: 'File:Bad.gif', videoinfo: [{ mime: 'image/gif', size: 1000, width: 400, height: 300, url: 'https://evil.example.com/a.gif' }] };
 
 describe('wiki media helpers', () => {
   test('accepts only Wikimedia hosts and strips tracking parameters', () => {
@@ -154,5 +156,29 @@ describe('createWikiMediaFinder', () => {
   test('never throws: failures give an empty result', async () => {
     const findMedia = createWikiMediaFinder({ fetchImpl: async () => { throw new Error('offline'); } });
     await expect(findMedia('Rain')).resolves.toEqual({ title: '', moving: [], pictures: [] });
+  });
+});
+
+describe('ranking and resolving topics', () => {
+  test('teaching diagrams come before charts', () => {
+    const k = topicKeywords(['Digestion']);
+    expect(rankScore({ title: 'Digestive system diagram' }, k)).toBeGreaterThan(rankScore({ title: 'Ara hybrid Catalina Macaw' }, k));
+    expect(rankScore({ title: 'Share of population, World, 2023' }, k)).toBeLessThan(0);
+  });
+
+  test('a topic that is not a page name is searched, even when Wikipedia returns a "missing" page', async () => {
+    const fetchImpl = async (url) => {
+      if (url.includes('list=search')) return { ok: true, json: async () => ({ query: { search: [{ title: 'Butterfly' }] } }) };
+      if (url.includes('titles=Butterfly')) return { ok: true, json: async () => ({ query: { pages: [{ ...photo, title: 'File:Butterfly life cycle diagram.jpg' }] } }) };
+      if (url.startsWith('https://en.wikipedia.org/')) return { ok: true, json: async () => ({ query: { pages: [{ ns: 0, title: 'Life cycle of a butterfly', missing: true }] } }) };
+      return { ok: true, json: async () => ({ batchcomplete: true }) };
+    };
+    const result = await createWikiMediaFinder({ fetchImpl })('Life cycle of a butterfly');
+    expect(result.title).toBe('Butterfly');
+    expect(result.pictures.map((p) => p.title)).toEqual(['Butterfly life cycle diagram']);
+  });
+
+  test('news photos of attacks are never shown', () => {
+    expect(toMediaItem({ ...photo, title: "File:Speech on the city hall attack.jpg" })).toBe(null);
   });
 });
