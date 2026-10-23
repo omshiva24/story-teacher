@@ -11,6 +11,21 @@ Search any topic, the way you would search Google: space, animals, maths, histor
 **Created by:** **P Om Shiva**, M.Tech CSE (2nd year), Pondicherry University · [GitHub @omshiva24](https://github.com/omshiva24)
 **© 2026 P Om Shiva. All rights reserved.** Copying or reusing any part of this project without written permission is not allowed. See [LICENSE](LICENSE).
 
+## 🛠️ Tech Stack
+
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black) ![Node.js](https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express.js-000000?logo=express&logoColor=white) ![Google Gemini](https://img.shields.io/badge/Google%20Gemini%20API-8E75B2?logo=googlegemini&logoColor=white) ![Jest](https://img.shields.io/badge/Jest-C21325?logo=jest&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white) ![Google Cloud Run](https://img.shields.io/badge/Google%20Cloud%20Run-4285F4?logo=googlecloud&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
+
+| Area | Technologies |
+|---|---|
+| Frontend | HTML5, CSS3, JavaScript (ES2022, no framework), SVG diagrams, Web Speech API |
+| Backend | Node.js 20, Express.js, REST API, Helmet (security headers, CSP), express-rate-limit, compression |
+| AI and APIs | Google Gemini API (`@google/genai`) with structured JSON output, Google Search grounding, Gemini text-to-speech, Wikipedia / Wikimedia API |
+| Testing and code quality | Jest, Supertest (245+ automated tests), ESLint, Prettier |
+| DevOps and cloud | Docker, Google Cloud Run, Google Secret Manager, Vercel, GitHub Actions CI |
+| Engineering practices | Input validation, prompt-injection defence, LRU caching, dependency injection, WCAG 2.1 AA accessibility |
+
+**Skills:** JavaScript · Node.js · Express.js · REST API design · Generative AI · LLM integration · Prompt engineering · Web security · Unit and API testing · Docker · CI/CD · Cloud deployment · Accessibility (WCAG)
+
 ## Why I made Story Teacher
 
 In India, ASER 2024 found that only **44.8% of Class 5 children can read a Class 2 text**, and only **30.7% can do a simple division**. The children are not the problem. Every child will listen to a story till the very end, but science and maths often reach them as dry pages to memorise.
